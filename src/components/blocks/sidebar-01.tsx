@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -236,12 +237,27 @@ export function AppSidebarLayout() {
                 <p className="text-sm text-muted-foreground">Welcome back!</p>
               </div>
             </div>
-            <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-              <div className="aspect-video rounded-xl bg-muted/50" />
-              <div className="aspect-video rounded-xl bg-muted/50" />
-              <div className="aspect-video rounded-xl bg-muted/50" />
-            </div>
-            <div className="min-h-24 rounded-xl bg-muted/50" />
+            <Tabs defaultValue="overview">
+              <TabsList variant="line" className="w-full border-b border-border">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                <TabsTrigger value="reports">Reports</TabsTrigger>
+              </TabsList>
+              <TabsContent value="overview" className="flex flex-col gap-4">
+                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+                  <div className="aspect-video rounded-xl bg-muted/50" />
+                  <div className="aspect-video rounded-xl bg-muted/50" />
+                  <div className="aspect-video rounded-xl bg-muted/50" />
+                </div>
+                <div className="min-h-24 rounded-xl bg-muted/50" />
+              </TabsContent>
+              <TabsContent value="analytics">
+                <div className="min-h-24 rounded-xl bg-muted/50" />
+              </TabsContent>
+              <TabsContent value="reports">
+                <div className="min-h-24 rounded-xl bg-muted/50" />
+              </TabsContent>
+            </Tabs>
           </div>
         </SidebarInset>
       </SidebarProvider>
