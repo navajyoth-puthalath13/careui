@@ -1,7 +1,8 @@
 import React from "react";
-import { AppSidebarDemo, InnerPageLayoutDemo } from "@/lib/registry/sidebar";
+import { AppSidebarDemo, InnerPageLayoutDemo, InnerPageLayout02Demo } from "@/lib/registry/sidebar";
 import { SIDEBAR_01_CODE } from "./sidebar-01";
 import { INNER_PAGE_01_CODE } from "./inner-page-01";
+import { INNER_PAGE_02_CODE } from "./inner-page-02";
 
 export type BlockCategory = "All" | "Sidebar" | "Authentication" | "Dashboard";
 
@@ -33,5 +34,14 @@ export const BLOCKS: BlockDef[] = [
     preview: (fullPage) => <InnerPageLayoutDemo fullPage={fullPage} />,
     scale: 0.68,
     code: INNER_PAGE_01_CODE,
+  },
+  {
+    id: "inner-page-02",
+    name: "Inner Page with Patient Detail",
+    description: "A patient detail page with a sidebar, stats cards, tab navigation, and condition tags.",
+    category: "Sidebar",
+    preview: (fullPage) => <InnerPageLayout02Demo fullPage={fullPage} />,
+    scale: 0.68,
+    code: INNER_PAGE_02_CODE,
   },
 ];
