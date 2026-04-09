@@ -64,12 +64,12 @@ const stats = [
 
 const user = { name: "Prabha Narendran", role: "Nurse", initials: "PN" }
 
-function NavUserCard() {
+function NavUserCard({ onMenuOpenChange }: { onMenuOpenChange?: (open: boolean) => void }) {
   const { isMobile } = useSidebar()
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
+          <DropdownMenu onOpenChange={onMenuOpenChange}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
               <Avatar className="h-8 w-8 rounded-lg">
@@ -126,7 +126,7 @@ function NavUserCard() {
 
 // ─── Inner sidebar ────────────────────────────────────────────────────────────
 
-function InnerSidebarContent({ pinned }: { pinned: boolean }) {
+function InnerSidebarContent({ pinned, onMenuOpenChange }: { pinned: boolean; onMenuOpenChange?: (open: boolean) => void }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const showHeader = pinned || isMobile
   return (
@@ -160,7 +160,7 @@ function InnerSidebarContent({ pinned }: { pinned: boolean }) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="border-t">
-        <NavUserCard />
+        <NavUserCard onMenuOpenChange={onMenuOpenChange} />
       </SidebarFooter>
     </>
   )
@@ -234,6 +234,7 @@ export function InnerPageLayout() {
   const [overlayReady, setOverlayReady] = useState(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const menuOpenRef = useRef(false)
 
   const cancelClose = useCallback(() => {
     clearTimeout(closeTimer.current ?? undefined)
@@ -248,7 +249,7 @@ export function InnerPageLayout() {
   }, [])
 
   const scheduleClose = useCallback(() => {
-    if (!pinned) {
+    if (!pinned && !menuOpenRef.current) {
       cancelClose()
       closeTimer.current = setTimeout(() => { setOverlayOpen(false); startSettle() }, 300)
     }
@@ -305,7 +306,14 @@ export function InnerPageLayout() {
             onMouseEnter={cancelClose}
             onMouseLeave={scheduleClose}
           >
-            <InnerSidebarContent pinned={pinned} />
+            <InnerSidebarContent
+              pinned={pinned}
+              onMenuOpenChange={(open) => {
+                menuOpenRef.current = open
+                if (open) cancelClose()
+                else scheduleClose()
+              }}
+            />
           </Sidebar>
 
           <SidebarInset className="overflow-hidden">

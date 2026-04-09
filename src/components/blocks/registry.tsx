@@ -1,5 +1,7 @@
 import React from "react";
-import { AppSidebarDemo, InnerPageLayoutDemo, InnerPageLayout02Demo } from "@/lib/registry/sidebar";
+import { AppSidebarDemo } from "@/lib/registry/sidebar-01-demo";
+import { InnerPageLayoutDemo } from "@/lib/registry/sidebar-inner-page-01-demo";
+import { InnerPageLayout02Demo } from "@/lib/registry/sidebar-inner-page-02-demo";
 import { SIDEBAR_01_CODE } from "./sidebar-01";
 import { INNER_PAGE_01_CODE } from "./inner-page-01";
 import { INNER_PAGE_02_CODE } from "./inner-page-02";

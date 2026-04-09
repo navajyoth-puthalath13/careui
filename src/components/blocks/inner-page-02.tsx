@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -38,6 +39,30 @@ import {
   Bell, CalendarDays, ChevronLeft, ChevronsUpDown,
   ClipboardList, Clock, Package, PanelLeft, Syringe, Users, X,
 } from "lucide-react"
+import { prepareWithSegments, measureNaturalWidth } from "@chenglou/pretext"
+
+// ─── Middle truncation ────────────────────────────────────────────────────────
+
+function truncateMiddle(text: string, font: string, maxWidth: number): string {
+  const measure = (t: string) =>
+    t ? measureNaturalWidth(prepareWithSegments(t, font)) : 0
+  if (measure(text) <= maxWidth) return text
+  const ELLIPSIS = "\u2026"
+  const ellipsisW = measure(ELLIPSIS)
+  const available = maxWidth - ellipsisW
+  if (available <= 0) return ELLIPSIS
+  let lo = 0
+  let hi = Math.floor(text.length / 2)
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    if (measure(text.slice(0, mid) + text.slice(text.length - mid)) <= available) {
+      lo = mid
+    } else {
+      hi = mid - 1
+    }
+  }
+  return text.slice(0, lo) + ELLIPSIS + text.slice(text.length - lo)
+}
 
 // ─── Navigation data ──────────────────────────────────────────────────────────
 
@@ -64,25 +89,57 @@ const patientItems = [
 
 function LocationSelector({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const [selected, setSelected] = useState(locations[0])
+  const labelRef = useRef<HTMLParagraphElement>(null)
+  const [displayName, setDisplayName] = useState(selected)
+
+  useEffect(() => {
+    const el = labelRef.current
+    if (!el) return
+    const update = () => {
+      const w = el.offsetWidth
+      if (w === 0) return
+      setDisplayName(truncateMiddle(selected, getComputedStyle(el).font, w))
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [selected])
+
+  const isTruncated = displayName !== selected
+
   return (
-    <DropdownMenu onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <button className="flex w-full items-center justify-between rounded-lg border bg-background px-3 py-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Chosen Location
-            </p>
-            <p className="truncate text-sm font-semibold">{selected}</p>
-          </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        {locations.map((loc) => (
-          <DropdownMenuItem key={loc} onClick={() => setSelected(loc)}>{loc}</DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Tooltip>
+      <DropdownMenu onOpenChange={onOpenChange}>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <button className="flex w-full items-center justify-between rounded-lg border bg-background px-3 py-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Chosen Location
+                </p>
+                <p ref={labelRef} className="text-sm font-semibold overflow-hidden whitespace-nowrap">
+                  {displayName}
+                </p>
+              </div>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        {isTruncated && (
+          <TooltipContent side="bottom">{selected}</TooltipContent>
+        )}
+        <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuRadioGroup value={selected} onValueChange={setSelected}>
+            {locations.map((loc) => (
+              <DropdownMenuRadioItem key={loc} value={loc}>
+                {loc}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </Tooltip>
   )
 }
 
@@ -275,7 +332,7 @@ export function InnerPageLayout() {
             else { setOverlayReady(false); setPinned(false); setOverlayOpen(false); startSettle() }
           }}
           className="h-full min-h-0!"
-          style={{ "--sidebar-width": "15rem" } as React.CSSProperties}
+          style={{ "--sidebar-width": "14rem" } as React.CSSProperties}
         >
           <Sidebar
             variant="sidebar"

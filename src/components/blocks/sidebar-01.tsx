@@ -52,7 +52,7 @@ const user = { name: "Prabha Narendran", role: "Nurse", initials: "PN" }
 
 // ─── Sidebar inner ────────────────────────────────────────────────────────────
 
-function AppSidebarInner({ pinned }: { pinned: boolean }) {
+function AppSidebarInner({ pinned, onMenuOpenChange }: { pinned: boolean; onMenuOpenChange?: (open: boolean) => void }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const showHeader = pinned || isMobile
   return (
@@ -85,7 +85,7 @@ function AppSidebarInner({ pinned }: { pinned: boolean }) {
       <SidebarFooter className="border-t">
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu>
+              <DropdownMenu onOpenChange={onMenuOpenChange}>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton size="lg">
                   <Avatar className="h-8 w-8 rounded-lg">
@@ -124,6 +124,7 @@ export function AppSidebarLayout() {
   const [overlayReady, setOverlayReady] = useState(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const menuOpenRef = useRef(false)
 
   const cancelClose = useCallback(() => {
     clearTimeout(closeTimer.current ?? undefined)
@@ -138,7 +139,7 @@ export function AppSidebarLayout() {
   }, [])
 
   const scheduleClose = useCallback(() => {
-    if (!pinned) {
+    if (!pinned && !menuOpenRef.current) {
       cancelClose()
       closeTimer.current = setTimeout(() => { setOverlayOpen(false); startSettle() }, 300)
     }
@@ -192,7 +193,14 @@ export function AppSidebarLayout() {
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
         >
-          <AppSidebarInner pinned={pinned} />
+          <AppSidebarInner
+            pinned={pinned}
+            onMenuOpenChange={(open) => {
+              menuOpenRef.current = open
+              if (open) cancelClose()
+              else scheduleClose()
+            }}
+          />
         </Sidebar>
 
         <SidebarInset className="overflow-hidden">

@@ -20,10 +20,10 @@ import { BLOCKS, type BlockCategory, type BlockDef } from "./registry";
 function BlockThumbnail({ block }: { block: BlockDef }) {
   const scale = block.scale ?? 0.5;
   const containerHeight = Math.round(480 * scale + 10);
+  const { setActiveComponent } = useNavigation();
 
   function openPreview() {
-    const base = window.location.pathname + window.location.search;
-    window.open(base + "#block-preview-" + block.id, "_blank", "noopener,noreferrer");
+    setActiveComponent("block-preview-" + block.id);
   }
 
   function openCode() {
@@ -149,11 +149,11 @@ export function BlockPreviewPage({ id }: { id: string }) {
           size="sm"
           variant="ghost"
           className="h-7 gap-1.5 px-2 text-xs"
-          onClick={() => setActiveComponent("get-started")}
-          aria-label="Back to home"
+          onClick={() => setActiveComponent("blocks")}
+          aria-label="Back to blocks"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
-          Home
+          Blocks
         </Button>
         <Separator orientation="vertical" />
         <span className="text-xs font-medium text-muted-foreground">{block.name}</span>
