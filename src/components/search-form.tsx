@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Search } from "lucide-react";
+import { Command as CommandIcon, Search } from "lucide-react";
 
 import { componentNames } from "@/lib/component-names";
 import {
@@ -73,13 +73,19 @@ export function SearchForm(props: React.ComponentProps<"form">) {
             className="cursor-pointer bg-background"
             onClick={() => setOpen(true)}
           >
+            <InputGroupAddon>
+              <Search className="text-muted-foreground" />
+            </InputGroupAddon>
             <InputGroupInput
               placeholder="Search..."
               readOnly
               className="cursor-pointer"
             />
             <InputGroupAddon>
-              <Search className="text-muted-foreground" />
+              <kbd className="pointer-events-none inline-flex h-5 items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                <CommandIcon className="size-3" />
+                K
+              </kbd>
             </InputGroupAddon>
           </InputGroup>
         </SidebarGroupContent>
