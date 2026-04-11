@@ -1,8 +1,103 @@
 import React from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { RadialSpinner } from "@/components/ui/spinner";
 import { Spinner } from "@/components/ui/spinner";
 import { type ComponentDoc } from "@/lib/types";
-import { ChevronRight, Mail, Plus, Trash2, X } from "lucide-react";
+import { CheckIcon, ChevronRight, Mail, Plus, RefreshCwIcon, SaveIcon, Trash2, X } from "lucide-react";
+
+type SaveState = "idle" | "saving" | "saved" | "error"
+
+const BTN_SPRING = { type: "spring" as const, duration: 0.3, bounce: 0 }
+const BTN_FADE_UP   = { initial: { opacity: 0, y:  6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0 }, transition: { ...BTN_SPRING, exit: { duration: 0 } } }
+const BTN_FADE_DOWN = { initial: { opacity: 0, y: -6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y:  6 }, transition: BTN_SPRING }
+const BTN_SNAP_IN   = { initial: { opacity: 1, y:  0 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -6 }, transition: BTN_SPRING }
+
+function SaveButtonDemo({ outcome }: { outcome: "saved" | "error" }) {
+  const [state, setState] = React.useState<SaveState>("idle")
+
+  function handleClick() {
+    if (state === "saving") return
+    setState("saving")
+    setTimeout(() => setState(outcome), 1500)
+  }
+
+  const isSaving = state === "saving"
+  const isSaved  = state === "saved"
+  const isError  = state === "error"
+
+  return React.createElement(
+    "div",
+    { className: "flex flex-col items-center gap-3" },
+    React.createElement(
+      Button,
+      {
+        variant: isError ? "destructive" : "default",
+        size: "sm",
+        disabled: isSaved,
+        onClick: handleClick,
+        className: `relative min-w-32 overflow-hidden${isSaving ? " pointer-events-none" : ""}`,
+      },
+      React.createElement(
+        AnimatePresence,
+        { mode: "popLayout", initial: false },
+        isSaving
+          ? React.createElement(
+              motion.span,
+              { key: "saving", className: "flex items-center justify-center", ...BTN_SNAP_IN },
+              React.createElement(RadialSpinner, { className: "text-inherit shrink-0" }),
+            )
+          : isSaved
+            ? React.createElement(
+                motion.span,
+                { key: "saved", className: "flex items-center gap-2", ...BTN_FADE_DOWN },
+                React.createElement(CheckIcon, { className: "size-4 shrink-0" }),
+                "Saved",
+              )
+            : isError
+              ? React.createElement(
+                  motion.span,
+                  { key: "error", className: "flex items-center gap-2", ...BTN_FADE_DOWN },
+                  React.createElement(RefreshCwIcon, { className: "size-4 shrink-0" }),
+                  "Retry",
+                )
+              : React.createElement(
+                  motion.span,
+                  { key: "idle", className: "flex items-center gap-2", ...BTN_FADE_UP },
+                  React.createElement(SaveIcon, { className: "size-4 shrink-0" }),
+                  "Save",
+                ),
+      ),
+    ),
+    React.createElement(
+      "span",
+      { className: "text-xs text-muted-foreground" },
+      outcome === "saved" ? "→ success" : "→ error / retry",
+    ),
+  )
+}
+
+function ButtonStatesPreview() {
+  const [resetKey, setResetKey] = React.useState(0)
+  return React.createElement(
+    "div",
+    { className: "flex flex-col items-center gap-6" },
+    React.createElement(
+      "div",
+      { key: resetKey, className: "flex flex-wrap gap-12 justify-center items-end" },
+      React.createElement(SaveButtonDemo, { outcome: "saved" }),
+      React.createElement(SaveButtonDemo, { outcome: "error" }),
+    ),
+    React.createElement(
+      "button",
+      {
+        className: "text-xs text-muted-foreground underline underline-offset-2 cursor-pointer",
+        onClick: () => setResetKey(k => k + 1),
+      },
+      "Reset",
+    ),
+  )
+}
 
 export const buttonDoc: ComponentDoc = {
   id: "button",
@@ -920,6 +1015,70 @@ export function ButtonSpinner() {
           )
         )
       ),
+    },
+    {
+      name: "Button States",
+      description: "RadialSpinner runs while saving — pure CSS steps() animation, zero JS overhead. On completion, CheckIcon + Saved or RefreshCwIcon + Retry slides in via AnimatePresence.",
+      code: `import { useState } from "react"
+import { AnimatePresence, motion } from "motion/react"
+import { CheckIcon, RefreshCwIcon, SaveIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { RadialSpinner } from "@/components/ui/spinner"
+
+type SaveState = "idle" | "saving" | "saved" | "error"
+
+const SPRING = { type: "spring" as const, duration: 0.3, bounce: 0 }
+const FADE_UP   = { initial: { opacity: 0, y:  6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0 }, transition: { ...SPRING, exit: { duration: 0 } } }
+const FADE_DOWN = { initial: { opacity: 0, y: -6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y:  6 }, transition: SPRING }
+const SNAP_IN   = { initial: { opacity: 1, y:  0 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -6 }, transition: SPRING }
+
+function SaveButton({ outcome }: { outcome: "saved" | "error" }) {
+  const [state, setState] = useState<SaveState>("idle")
+
+  function handleClick() {
+    if (state === "saving") return
+    setState("saving")
+    setTimeout(() => setState(outcome), 1500)
+  }
+
+  const isSaving = state === "saving"
+  const isSaved  = state === "saved"
+  const isError  = state === "error"
+
+  return (
+    <Button
+      variant={isError ? "destructive" : "default"}
+      size="sm"
+      disabled={isSaved}
+      onClick={handleClick}
+      className={"relative min-w-32 overflow-hidden" + (isSaving ? " pointer-events-none" : "")}
+    >
+      <AnimatePresence mode="popLayout" initial={false}>
+        {isSaving ? (
+          <motion.span key="saving" className="flex items-center justify-center" {...SNAP_IN}>
+            <RadialSpinner className="text-inherit shrink-0" />
+          </motion.span>
+        ) : isSaved ? (
+          <motion.span key="saved" className="flex items-center gap-2" {...FADE_DOWN}>
+            <CheckIcon className="size-4 shrink-0" />
+            Saved
+          </motion.span>
+        ) : isError ? (
+          <motion.span key="error" className="flex items-center gap-2" {...FADE_DOWN}>
+            <RefreshCwIcon className="size-4 shrink-0" />
+            Retry
+          </motion.span>
+        ) : (
+          <motion.span key="idle" className="flex items-center gap-2" {...FADE_UP}>
+            <SaveIcon className="size-4 shrink-0" />
+            Save
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </Button>
+  )
+}`,
+      preview: React.createElement(ButtonStatesPreview, {}),
     },
   ],
 };

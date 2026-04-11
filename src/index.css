@@ -308,6 +308,10 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="spinner-track"] { animation: none !important; }
+}
+
 @utility hit-area-debug {
     position:  relative;
   &::before {

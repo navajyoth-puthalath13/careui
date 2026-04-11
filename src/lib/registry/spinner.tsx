@@ -1,6 +1,6 @@
 import React from "react";
 import { type ComponentDoc } from "@/lib/types";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner, RadialSpinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,7 +24,8 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
-import { ArrowUpIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ArrowUpIcon, LoaderIcon } from "lucide-react";
 
 export const spinnerDoc: ComponentDoc = {
   id: "spinner",
@@ -340,6 +341,160 @@ export function SpinnerEmpty() {
             "Cancel"
           )
         )
+      ),
+    },
+    // ── Customization ─────────────────────────────────────────────────────
+    {
+      name: "Customization",
+      description: "Replace the default spinner icon with any icon by editing the Spinner component.",
+      code: `import { LoaderIcon } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
+  return (
+    <LoaderIcon
+      role="status"
+      aria-label="Loading"
+      className={cn("size-4 animate-spin", className)}
+      {...props}
+    />
+  )
+}
+
+export function SpinnerCustom() {
+  return (
+    <div className="flex items-center gap-4">
+      <Spinner />
+    </div>
+  )
+}`,
+      preview: React.createElement(
+        "div",
+        { className: "flex items-center gap-4" },
+        React.createElement(LoaderIcon, {
+          role: "status",
+          "aria-label": "Loading",
+          className: cn("size-4 animate-spin"),
+        } as any)
+      ),
+    },
+    // ── RTL ───────────────────────────────────────────────────────────────
+    {
+      name: "RTL",
+      description: "Spinner renders correctly in right-to-left layouts.",
+      code: `"use client"
+
+import * as React from "react"
+
+import {
+  useTranslation,
+  type Translations,
+} from "@/components/language-selector"
+import {
+  Item,
+  ItemContent,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item"
+import { Spinner } from "@/components/ui/spinner"
+
+const translations: Translations = {
+  en: {
+    dir: "ltr",
+    values: {
+      title: "Processing payment...",
+      amount: "$100.00",
+    },
+  },
+  ar: {
+    dir: "rtl",
+    values: {
+      title: "جاري معالجة الدفع...",
+      amount: "١٠٠.٠٠ دولار",
+    },
+  },
+  he: {
+    dir: "rtl",
+    values: {
+      title: "מעבד תשלום...",
+      amount: "$100.00",
+    },
+  },
+}
+
+export function SpinnerRtl() {
+  const { dir, t } = useTranslation(translations, "ar")
+
+  return (
+    <div
+      className="flex w-full max-w-xs flex-col gap-4 [--radius:1rem]"
+      dir={dir}
+    >
+      <Item variant="muted" dir={dir}>
+        <ItemMedia>
+          <Spinner />
+        </ItemMedia>
+        <ItemContent>
+          <ItemTitle className="line-clamp-1">{t.title}</ItemTitle>
+        </ItemContent>
+        <ItemContent className="flex-none justify-end">
+          <span className="text-sm tabular-nums">{t.amount}</span>
+        </ItemContent>
+      </Item>
+    </div>
+  )
+}`,
+      preview: React.createElement(
+        "div",
+        { className: "flex w-full max-w-xs flex-col gap-4 [--radius:1rem]", dir: "rtl" },
+        React.createElement(
+          Item,
+          { variant: "muted" } as any,
+          React.createElement(ItemMedia, {}, React.createElement(Spinner, {})),
+          React.createElement(
+            ItemContent,
+            {},
+            React.createElement(
+              ItemTitle,
+              { className: "line-clamp-1" },
+              "جاري معالجة الدفع..."
+            )
+          ),
+          React.createElement(
+            ItemContent,
+            { className: "flex-none justify-end" },
+            React.createElement(
+              "span",
+              { className: "text-sm tabular-nums" },
+              "١٠٠.٠٠ دولار"
+            )
+          )
+        )
+      ),
+    },
+    {
+      name: "Radial Spinner",
+      description: "A 12-bar radial spinner — the classic iOS/macOS activity indicator. Use size-* utilities to scale; inherits currentColor.",
+      code: `import { RadialSpinner } from "@/components/ui/spinner"
+
+export function RadialSpinnerDemo() {
+  return (
+    <div className="flex items-center gap-6">
+      <RadialSpinner className="size-3" />
+      <RadialSpinner className="size-4" />
+      <RadialSpinner className="size-6" />
+      <RadialSpinner className="size-8" />
+    </div>
+  )
+}`,
+      preview: React.createElement(
+        "div",
+        { className: "flex items-center gap-6" },
+        React.createElement(RadialSpinner, { className: "size-3" }),
+        React.createElement(RadialSpinner, { className: "size-4" }),
+        React.createElement(RadialSpinner, { className: "size-6" }),
+        React.createElement(RadialSpinner, { className: "size-8" }),
       ),
     },
   ],

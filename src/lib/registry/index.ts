@@ -108,6 +108,12 @@ const componentLoaders: Record<
   slider: () => import("./slider").then((m) => ({ default: m.sliderDoc })),
   sonner: () => import("./sonner").then((m) => ({ default: m.sonnerDoc })),
   spinner: () => import("./spinner").then((m) => ({ default: m.spinnerDoc })),
+  "unicode-spinner": () =>
+    import("./unicode-spinner").then((m) => ({ default: m.unicodeSpinnerDoc })),
+  "pixel-spinner": () =>
+    import("./pixel-spinner").then((m) => ({ default: m.pixelSpinnerDoc })),
+  "matrix-spinner": () =>
+    import("./matrix-spinner").then((m) => ({ default: m.matrixSpinnerDoc })),
   switch: () => import("./switch").then((m) => ({ default: m.switchDoc })),
   table: () => import("./table").then((m) => ({ default: m.tableDoc })),
   tabs: () => import("./tabs").then((m) => ({ default: m.tabsDoc })),
