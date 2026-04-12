@@ -119,6 +119,37 @@ function TabsDemoPreview() {
   );
 }
 
+function TabsBrowserPreview() {
+  return React.createElement(
+    Tabs,
+    { defaultValue: "medication" },
+    React.createElement(
+      TabsList,
+      { variant: "browser" },
+      React.createElement(
+        TabsTrigger,
+        { value: "medication" },
+        "Medication Request"
+      ),
+      React.createElement(
+        TabsTrigger,
+        { value: "history" },
+        "Patient Clinical History"
+      )
+    ),
+    React.createElement(
+      TabsContent,
+      { value: "medication", className: "border border-border rounded-b-lg p-4 mt-0" },
+      React.createElement("p", { className: "text-sm text-muted-foreground" }, "Medication request details go here.")
+    ),
+    React.createElement(
+      TabsContent,
+      { value: "history", className: "border border-border rounded-b-lg p-4 mt-0" },
+      React.createElement("p", { className: "text-sm text-muted-foreground" }, "Patient clinical history goes here.")
+    )
+  );
+}
+
 function TabsLinePreview() {
   return React.createElement(
     Tabs,
@@ -296,6 +327,30 @@ export function TabsDemo() {
     component: React.createElement(TabsDemoPreview),
   },
   examples: [
+    {
+      name: "Browser",
+      description:
+        'Use the variant="browser" prop on TabsList for a browser-tab style that connects to content below.',
+      code: `import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+
+export function TabsBrowser() {
+  return (
+    <Tabs defaultValue="medication">
+      <TabsList variant="browser">
+        <TabsTrigger value="medication">Medication Request</TabsTrigger>
+        <TabsTrigger value="history">Patient Clinical History</TabsTrigger>
+      </TabsList>
+      <TabsContent value="medication" className="border border-border rounded-b-lg p-4 mt-0">
+        Medication request details go here.
+      </TabsContent>
+      <TabsContent value="history" className="border border-border rounded-b-lg p-4 mt-0">
+        Patient clinical history goes here.
+      </TabsContent>
+    </Tabs>
+  )
+}`,
+      preview: React.createElement(TabsBrowserPreview),
+    },
     {
       name: "Line",
       description:
