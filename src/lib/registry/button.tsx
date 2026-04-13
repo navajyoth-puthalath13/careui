@@ -33,7 +33,7 @@ function SaveButtonDemo({ outcome }: { outcome: "saved" | "error" }) {
       Button,
       {
         variant: isError ? "destructive" : "default",
-        size: "sm",
+        size: "default",
         disabled: isSaved,
         onClick: handleClick,
         className: `relative min-w-32 overflow-hidden${isSaving ? " pointer-events-none" : ""}`,
@@ -1048,7 +1048,7 @@ function SaveButton({ outcome }: { outcome: "saved" | "error" }) {
   return (
     <Button
       variant={isError ? "destructive" : "default"}
-      size="sm"
+      size="default"
       disabled={isSaved}
       onClick={handleClick}
       className={"relative min-w-32 overflow-hidden" + (isSaving ? " pointer-events-none" : "")}
