@@ -24,6 +24,7 @@ import {
 import { useNavigation } from "@/contexts/navigation-context";
 import { getComponentIds } from "@/lib/component-registry";
 import { documentationPages } from "@/lib/documentation";
+import { Kbd } from "@/components/ui/kbd";
 
 const navSections = [
   {
@@ -53,6 +54,10 @@ export function SearchForm(props: React.ComponentProps<"form">) {
   const [open, setOpen] = React.useState(false);
   const { setActiveComponent } = useNavigation();
   const { isMobile, setOpenMobile } = useSidebar();
+  const isMac = React.useMemo(
+    () => navigator.platform.toUpperCase().includes("MAC"),
+    []
+  );
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -70,7 +75,7 @@ export function SearchForm(props: React.ComponentProps<"form">) {
       <SidebarGroup className="px-0 py-0">
         <SidebarGroupContent>
           <InputGroup
-            className="cursor-pointer bg-background"
+            className="relative cursor-pointer bg-background"
             onClick={() => setOpen(true)}
           >
             <InputGroupAddon>
@@ -79,14 +84,12 @@ export function SearchForm(props: React.ComponentProps<"form">) {
             <InputGroupInput
               placeholder="Search..."
               readOnly
-              className="cursor-pointer"
+              className="cursor-pointer pr-14"
             />
-            <InputGroupAddon>
-              <kbd className="pointer-events-none inline-flex h-5 items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-                <CommandIcon className="size-3" />
-                K
-              </kbd>
-            </InputGroupAddon>
+            <Kbd className="pointer-events-none absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-0.5">
+              {isMac ? <CommandIcon className="size-3" /> : "Ctrl "}
+              K
+            </Kbd>
           </InputGroup>
         </SidebarGroupContent>
       </SidebarGroup>
