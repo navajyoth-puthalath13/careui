@@ -46,14 +46,9 @@ export function ThemeProvider({
       return;
     }
 
-    if (theme === "dark-protanopia") {
-      // .dark enables dark: utilities; .dark-protanopia overrides primary+destructive
-      root.classList.add("dark", "dark-protanopia");
-      return;
-    }
-
-    if (theme === "dark-tritanopia") {
-      root.classList.add("dark", "dark-tritanopia");
+    // dark-protanopia and dark-tritanopia need .dark for dark: utilities
+    if (theme.startsWith("dark-")) {
+      root.classList.add("dark", theme);
       return;
     }
 

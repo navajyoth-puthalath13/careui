@@ -138,11 +138,12 @@
     --sidebar-ring: var(--color-indigo-400);
 }
 
-/* ── Light: Protanopia & Deuteranopia ──────────────────────────────────────
-   Replaces green (emerald) primary with blue and red destructive with orange
-   so that red-green confusable colors are never used as the sole differentiator.
+/* ── Protanopia & Deuteranopia — shared primary scale (blue) ──────────────
+   Both light and dark variants share the same blue scale.
+   Semantic tokens are set per-variant below.
 */
-.light-protanopia {
+.light-protanopia,
+.dark-protanopia {
     --primary-50:  var(--color-blue-50);
     --primary-100: var(--color-blue-100);
     --primary-200: var(--color-blue-200);
@@ -154,7 +155,13 @@
     --primary-800: var(--color-blue-800);
     --primary-900: var(--color-blue-900);
     --primary-950: var(--color-blue-950);
+}
 
+/* ── Light: Protanopia & Deuteranopia ──────────────────────────────────────
+   Replaces green (emerald) primary with blue and red destructive with orange
+   so that red-green confusable colors are never used as the sole differentiator.
+*/
+.light-protanopia {
     --primary: var(--color-blue-800);
     --primary-foreground: var(--color-blue-50);
 
@@ -173,18 +180,6 @@
    only the primary and destructive scales.
 */
 .dark-protanopia {
-    --primary-50:  var(--color-blue-50);
-    --primary-100: var(--color-blue-100);
-    --primary-200: var(--color-blue-200);
-    --primary-300: var(--color-blue-300);
-    --primary-400: var(--color-blue-400);
-    --primary-500: var(--color-blue-500);
-    --primary-600: var(--color-blue-600);
-    --primary-700: var(--color-blue-700);
-    --primary-800: var(--color-blue-800);
-    --primary-900: var(--color-blue-900);
-    --primary-950: var(--color-blue-950);
-
     --primary: var(--color-blue-400);
     --primary-foreground: var(--color-blue-950);
 
@@ -198,12 +193,11 @@
     --sidebar-ring: var(--color-blue-400);
 }
 
-/* ── Light: Tritanopia ─────────────────────────────────────────────────────
-   Replaces green (emerald) primary with rose. Red destructive is kept as-is
-   since red is distinguishable for tritanopes. Avoids blue/green and
-   yellow/purple confusable pairs as sole visual differentiators.
+/* ── Tritanopia — shared primary scale (rose) ──────────────────────────────
+   Both light and dark variants share the same rose scale.
 */
-.light-tritanopia {
+.light-tritanopia,
+.dark-tritanopia {
     --primary-50:  var(--color-rose-50);
     --primary-100: var(--color-rose-100);
     --primary-200: var(--color-rose-200);
@@ -215,7 +209,14 @@
     --primary-800: var(--color-rose-800);
     --primary-900: var(--color-rose-900);
     --primary-950: var(--color-rose-950);
+}
 
+/* ── Light: Tritanopia ─────────────────────────────────────────────────────
+   Replaces green (emerald) primary with rose. Red destructive is kept as-is
+   since red is distinguishable for tritanopes. Avoids blue/green and
+   yellow/purple confusable pairs as sole visual differentiators.
+*/
+.light-tritanopia {
     --primary: var(--color-rose-700);
     --primary-foreground: var(--color-rose-50);
 
@@ -230,18 +231,6 @@
    Applied alongside .dark — overrides only primary scale with rose.
 */
 .dark-tritanopia {
-    --primary-50:  var(--color-rose-50);
-    --primary-100: var(--color-rose-100);
-    --primary-200: var(--color-rose-200);
-    --primary-300: var(--color-rose-300);
-    --primary-400: var(--color-rose-400);
-    --primary-500: var(--color-rose-500);
-    --primary-600: var(--color-rose-600);
-    --primary-700: var(--color-rose-700);
-    --primary-800: var(--color-rose-800);
-    --primary-900: var(--color-rose-900);
-    --primary-950: var(--color-rose-950);
-
     --primary: var(--color-rose-400);
     --primary-foreground: var(--color-rose-950);
 
