@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-type Theme = "dark" | "light" | "system";
+export type Theme = "dark" | "light" | "system" | "light-protanopia" | "dark-protanopia" | "light-tritanopia" | "dark-tritanopia";
+
+const ALL_THEME_CLASSES: Theme[] = ["light", "dark", "light-protanopia", "dark-protanopia", "light-tritanopia", "dark-tritanopia"];
 
 type ThemeProviderProps = {
   children: React.ReactNode;
@@ -33,15 +35,25 @@ export function ThemeProvider({
   useEffect(() => {
     const root = window.document.documentElement;
 
-    root.classList.remove("light", "dark");
+    root.classList.remove(...ALL_THEME_CLASSES);
 
     if (theme === "system") {
       const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
         .matches
         ? "dark"
         : "light";
-
       root.classList.add(systemTheme);
+      return;
+    }
+
+    if (theme === "dark-protanopia") {
+      // .dark enables dark: utilities; .dark-protanopia overrides primary+destructive
+      root.classList.add("dark", "dark-protanopia");
+      return;
+    }
+
+    if (theme === "dark-tritanopia") {
+      root.classList.add("dark", "dark-tritanopia");
       return;
     }
 
