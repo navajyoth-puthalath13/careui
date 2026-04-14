@@ -81,6 +81,7 @@ const a11yThemeOptions: {
   value: Theme;
   label: string;
   description: string;
+  subtext: string;
   icon: React.ElementType;
   preview: React.ReactNode;
 }[] = [
@@ -88,6 +89,7 @@ const a11yThemeOptions: {
     value: "light-protanopia",
     label: "Light",
     description: "Protanopia & Deuteranopia",
+    subtext: "Difficulty distinguishing reds & greens",
     icon: Eye,
     preview: (
       <div className="h-10 w-full rounded-md border border-neutral-200 bg-white shadow-sm">
@@ -106,6 +108,7 @@ const a11yThemeOptions: {
     value: "dark-protanopia",
     label: "Dark",
     description: "Protanopia & Deuteranopia",
+    subtext: "Difficulty distinguishing reds & greens",
     icon: Eye,
     preview: (
       <div className="h-10 w-full rounded-md border border-neutral-700 bg-neutral-900 shadow-sm">
@@ -124,6 +127,7 @@ const a11yThemeOptions: {
     value: "light-tritanopia",
     label: "Light",
     description: "Tritanopia",
+    subtext: "Difficulty distinguishing blues & greens",
     icon: Eye,
     preview: (
       <div className="h-10 w-full rounded-md border border-neutral-200 bg-white shadow-sm">
@@ -142,6 +146,7 @@ const a11yThemeOptions: {
     value: "dark-tritanopia",
     label: "Dark",
     description: "Tritanopia",
+    subtext: "Difficulty distinguishing blues & greens",
     icon: Eye,
     preview: (
       <div className="h-10 w-full rounded-md border border-neutral-700 bg-neutral-900 shadow-sm">
@@ -281,7 +286,7 @@ export function SettingsPage() {
                 (Tritanopia).
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3">
               {a11yThemeOptions.map((option) => {
                 const Icon = option.icon;
                 const isActive = theme === option.value;
@@ -314,9 +319,14 @@ export function SettingsPage() {
                         {option.label}
                       </span>
                     </div>
-                    <p className="text-muted-foreground text-xs">
-                      {option.description}
-                    </p>
+                    <div>
+                      <p className="text-xs font-medium text-foreground">
+                        {option.description}
+                      </p>
+                      <p className="text-muted-foreground text-xs">
+                        {option.subtext}
+                      </p>
+                    </div>
                   </button>
                 );
               })}
