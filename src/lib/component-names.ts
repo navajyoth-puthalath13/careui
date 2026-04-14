@@ -19,6 +19,7 @@ export const componentNames: Record<string, string> = {
   "context-menu": "Context Menu",
   dialog: "Dialog",
   drawer: "Drawer",
+  "dotted-divider": "Dotted Divider",
   "dropdown-menu": "Dropdown Menu",
   empty: "Empty",
   field: "Field",

@@ -434,6 +434,13 @@
     ]
   },
   {
+    "name": "dotted-divider",
+    "type": "registry:ui",
+    "files": [
+      "registry/care-ui/dotted-divider/dotted-divider.tsx"
+    ]
+  },
+  {
     "name": "dialog",
     "type": "registry:ui",
     "dependencies": [

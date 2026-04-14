@@ -92,6 +92,35 @@ function SeparatorDemo() {
           "A set of beautifully designed components."
         )
       )
+    ),
+    React.createElement(
+      "div",
+      { className: "flex flex-col gap-3" },
+      React.createElement(
+        "p",
+        { className: "text-xs font-medium uppercase tracking-wider text-muted-foreground" },
+        "Dotted"
+      ),
+      React.createElement(
+        "div",
+        { className: "flex flex-col gap-4" },
+        React.createElement(
+          "div",
+          { className: "flex flex-col gap-1.5" },
+          React.createElement("div", { className: "leading-none font-medium" }, "shadcn/ui"),
+          React.createElement(
+            "div",
+            { className: "text-muted-foreground" },
+            "The Foundation for your Design System"
+          )
+        ),
+        React.createElement(Separator, { variant: "dotted" }),
+        React.createElement(
+          "div",
+          { className: "text-muted-foreground" },
+          "A set of beautifully designed components."
+        )
+      )
     )
   );
 }
@@ -197,6 +226,29 @@ function SeparatorList() {
   );
 }
 
+function SeparatorDotted() {
+  return React.createElement(
+    "div",
+    { className: "flex max-w-sm flex-col gap-4 text-sm" },
+    React.createElement(
+      "div",
+      { className: "flex flex-col gap-1.5" },
+      React.createElement("div", { className: "leading-none font-medium" }, "shadcn/ui"),
+      React.createElement(
+        "div",
+        { className: "text-muted-foreground" },
+        "The Foundation for your Design System"
+      )
+    ),
+    React.createElement(Separator, { variant: "dotted" }),
+    React.createElement(
+      "div",
+      { className: "text-muted-foreground" },
+      "A set of beautifully designed components that you can customize, extend, and build on."
+    )
+  );
+}
+
 function SeparatorInset() {
   return React.createElement(
     "div",
@@ -288,6 +340,23 @@ export function SeparatorDemo() {
           </div>
         </div>
       </div>
+      <div className="flex flex-col gap-3">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Dotted
+        </p>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <div className="leading-none font-medium">shadcn/ui</div>
+            <div className="text-muted-foreground">
+              The Foundation for your Design System
+            </div>
+          </div>
+          <Separator variant="dotted" />
+          <div className="text-muted-foreground">
+            A set of beautifully designed components.
+          </div>
+        </div>
+      </div>
     </div>
   )
 }`,
@@ -341,6 +410,30 @@ export function SeparatorInset() {
   )
 }`,
       preview: React.createElement(SeparatorInset),
+    },
+    {
+      name: "Dotted",
+      description: 'Use variant="dotted" for a dot-matrix separator rendered via CSS background pattern.',
+      code: `import { Separator } from "@/components/ui/separator"
+
+export function SeparatorDotted() {
+  return (
+    <div className="flex max-w-sm flex-col gap-4 text-sm">
+      <div className="flex flex-col gap-1.5">
+        <div className="leading-none font-medium">shadcn/ui</div>
+        <div className="text-muted-foreground">
+          The Foundation for your Design System
+        </div>
+      </div>
+      <Separator variant="dotted" />
+      <div className="text-muted-foreground">
+        A set of beautifully designed components that you can customize, extend,
+        and build on.
+      </div>
+    </div>
+  )
+}`,
+      preview: React.createElement(SeparatorDotted),
     },
     {
       name: "Vertical",
@@ -422,7 +515,7 @@ export function SeparatorList() {
   props: [
     {
       name: "variant",
-      type: '"solid" | "dashed" | "inset"',
+      type: '"solid" | "dashed" | "inset" | "dotted"',
       description: "The visual style of the separator.",
       default: '"solid"',
     },

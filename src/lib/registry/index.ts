@@ -64,6 +64,8 @@ const componentLoaders: Record<
   "context-menu": () =>
     import("./context-menu").then((m) => ({ default: m.contextMenuDoc })),
   dialog: () => import("./dialog").then((m) => ({ default: m.dialogDoc })),
+  "dotted-divider": () =>
+    import("./dotted-divider").then((m) => ({ default: m.dottedDividerDoc })),
   drawer: () => import("./drawer").then((m) => ({ default: m.drawerDoc })),
   "dropdown-menu": () =>
     import("./dropdown-menu").then((m) => ({ default: m.dropdownMenuDoc })),
