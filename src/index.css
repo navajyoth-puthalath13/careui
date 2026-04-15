@@ -470,6 +470,7 @@
 @theme {
   --animate-sheet-shake: sheet-shake 0.4s ease;
   --animate-blink: blink 1.5s infinite;
+  --animate-blossom: blossom 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 
   @keyframes sheet-shake {
     0%, 100% { transform: translateX(0) rotate(0deg); }
@@ -484,6 +485,13 @@
   @keyframes blink {
     0%, 100% { opacity: 0; }
     50%       { opacity: 1; }
+  }
+
+  @keyframes blossom {
+    0%   { transform: scale(0.05) rotate(-120deg); opacity: 0; }
+    60%  { transform: scale(1.18) rotate(8deg);    opacity: 1; }
+    80%  { transform: scale(0.94) rotate(-3deg);   opacity: 1; }
+    100% { transform: scale(1)    rotate(0deg);    opacity: 1; }
   }
 }
 

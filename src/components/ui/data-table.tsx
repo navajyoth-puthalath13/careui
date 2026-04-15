@@ -49,6 +49,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -186,6 +187,8 @@ function DataTable<TData, TValue>({
       {/* Table */}
       <div className={cn(
         "overflow-hidden rounded-md border",
+        "[&_th:first-child:not(:has([data-slot=checkbox]))_[data-slot=button]]:-ms-1",
+        "[&_th:not(:first-child)_[data-slot=button]]:-ms-3",
         cellBorder && "[&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r",
         dense && "[&_td]:py-1.5 [&_th]:h-8 [&_th]:py-0",
         autoWidth && "w-fit [&_table]:w-auto"
@@ -194,7 +197,7 @@ function DataTable<TData, TValue>({
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header, index) => (
+                {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
                     draggable={movableColumns || undefined}
@@ -216,7 +219,6 @@ function DataTable<TData, TValue>({
                     } : undefined}
                     className={cn(
                       header.column.columnDef.meta?.className,
-                      index === 0 && "**:data-[slot=button]:-ml-1.5",
                       movableColumns && "cursor-grab select-none",
                     )}
                   >
@@ -270,6 +272,30 @@ function DataTable<TData, TValue>({
               </TableRow>
             )}
           </TableBody>
+          {table.getFooterGroups().some((fg) =>
+            fg.headers.some((h) => h.column.columnDef.footer)
+          ) && (
+            <TableFooter>
+              {table.getFooterGroups().map((footerGroup) => (
+                <TableRow key={footerGroup.id}>
+                  {footerGroup.headers.map((footer) => (
+                    <TableCell
+                      key={footer.id}
+                      colSpan={footer.colSpan}
+                      className={cn(footer.column.columnDef.meta?.className)}
+                    >
+                      {footer.isPlaceholder
+                        ? null
+                        : flexRender(
+                            footer.column.columnDef.footer,
+                            footer.getContext()
+                          )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableFooter>
+          )}
         </Table>
       </div>
 
@@ -329,7 +355,7 @@ function DataTableColumnHeader<TValue>({
     <Button
       variant="ghost"
       size="sm"
-      className={cn("-ml-3", className)}
+      className={cn(className)}
       onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
     >
       {icon && <span className="shrink-0 text-muted-foreground [&_svg]:size-3.5">{icon}</span>}

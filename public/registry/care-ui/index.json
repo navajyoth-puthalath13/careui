@@ -62,6 +62,9 @@
   {
     "name": "table",
     "type": "registry:ui",
+    "dependencies": [
+      "none"
+    ],
     "files": [
       "registry/care-ui/table/table.tsx"
     ]

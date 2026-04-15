@@ -10,10 +10,39 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { type ColumnDef, type Row } from "@tanstack/react-table";
-import { ChevronDown, ChevronUp, User, MapPin, Stethoscope, HeartPulse } from "lucide-react";
+import {
+  type ColumnDef,
+  type Header,
+  type Row,
+  type RowPinningState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { ChevronDown, ChevronUp, GripVertical, HeartPulse, MapPin, Pin, PinOff, Stethoscope, User } from "lucide-react";
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // ─── Patient data ─────────────────────────────────────────────────────────────
 
@@ -157,10 +186,8 @@ const patientCell = (name: string, id: string) =>
   React.createElement(
     "div",
     { className: "flex items-center gap-3" },
-    React.createElement(
-      "div",
-      { className: "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary" },
-      getInitials(name)
+    React.createElement(Avatar, { shape: "rounded" },
+      React.createElement(AvatarFallback, { color: "primary" }, getInitials(name))
     ),
     React.createElement(
       "div",
@@ -402,10 +429,8 @@ const staffCell = (name: string, email: string) =>
   React.createElement(
     "div",
     { className: "flex items-center gap-3" },
-    React.createElement(
-      "div",
-      { className: "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary" },
-      getInitials(name)
+    React.createElement(Avatar, { shape: "circle" },
+      React.createElement(AvatarFallback, { color: "primary" }, getInitials(name))
     ),
     React.createElement(
       "div",
@@ -514,6 +539,248 @@ const MovableColumnsDemo = () =>
     filterPlaceholder: "Search staff...",
     movableColumns: true,
   });
+
+// ─── Draggable columns data & demo ───────────────────────────────────────────
+
+type DndMember = {
+  id: string;
+  name: string;
+  avatar: string;
+  email: string;
+  company: string;
+  role: string;
+  status: "active" | "inactive";
+};
+
+const dndMembers: DndMember[] = [
+  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", email: "alex@apple.com",    company: "Apple",      role: "CEO",             status: "active"   },
+  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", email: "sarah@openai.com",  company: "OpenAI",     role: "CTO",             status: "inactive" },
+  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", email: "michael@meta.com",  company: "Meta",       role: "Designer",        status: "active"   },
+  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", email: "emma@tesla.com",    company: "Tesla",      role: "Developer",       status: "inactive" },
+  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", email: "david@sap.com",     company: "SAP",        role: "Lawyer",          status: "inactive" },
+  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", email: "aron@keen.com",     company: "Keenthemes", role: "Director",        status: "active"   },
+  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", email: "james@bbva.es",     company: "BBVA",       role: "Product Manager", status: "inactive" },
+  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", email: "maria@sony.jp",     company: "Sony",       role: "Marketing Lead",  status: "inactive" },
+  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", email: "nick@lvmh.fr",      company: "LVMH",       role: "Data Scientist",  status: "inactive" },
+  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", email: "liam@eni.it",       company: "ENI",        role: "Engineer",        status: "inactive" },
+  { id: "11", name: "Pooja Iyer",        avatar: "https://images.unsplash.com/photo-1619946794135-5bc917a27793?w=96&h=96&dpr=2&q=80", email: "pooja@tata.in",     company: "Tata",       role: "Sales Manager",   status: "active"   },
+];
+
+function DndSortableHeader({
+  header,
+  transform,
+  isDragging,
+  noTransition,
+  onRef,
+}: {
+  header: Header<DndMember, unknown>;
+  transform: number;
+  isDragging: boolean;
+  noTransition: boolean;
+  onRef: (el: HTMLElement | null) => void;
+}) {
+  const { attributes, listeners, setNodeRef } = useSortable({ id: header.id });
+
+  return (
+    <TableHead
+      ref={(el) => { setNodeRef(el); onRef(el); }}
+      colSpan={header.colSpan}
+      style={{
+        opacity: isDragging ? 0.4 : 1,
+        transform: transform !== 0 ? `translateX(${transform}px)` : undefined,
+        position: transform !== 0 || isDragging ? "relative" : undefined,
+        zIndex: isDragging ? 10 : undefined,
+        transition: (isDragging || noTransition) ? "none" : "transform 100ms ease",
+      }}
+    >
+      <div className="flex items-center gap-1">
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
+          aria-label="Drag to reorder column"
+        >
+          <GripVertical className="size-3.5" />
+        </button>
+        {header.isPlaceholder
+          ? null
+          : flexRender(header.column.columnDef.header, header.getContext())}
+      </div>
+    </TableHead>
+  );
+}
+
+const dndMemberColumns: ColumnDef<DndMember>[] = [
+  {
+    id: "name",
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <Avatar shape="circle">
+          <AvatarImage src={row.original.avatar} alt={row.original.name} />
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
+        <span className="font-medium text-sm">{row.original.name}</span>
+      </div>
+    ),
+  },
+  {
+    id: "email",
+    accessorKey: "email",
+    header: "Email",
+    cell: ({ row }) => (
+      <span className="text-muted-foreground text-sm">{row.original.email}</span>
+    ),
+  },
+  {
+    id: "company",
+    accessorKey: "company",
+    header: "Company",
+    cell: ({ row }) => (
+      <span className="font-medium text-sm">{row.original.company}</span>
+    ),
+  },
+  {
+    id: "role",
+    accessorKey: "role",
+    header: "Occupation",
+    cell: ({ row }) => (
+      <span className="text-sm">{row.original.role}</span>
+    ),
+  },
+  {
+    id: "status",
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) =>
+      row.original.status === "active"
+        ? React.createElement(Badge, { variant: "success" }, "Approved")
+        : React.createElement(Badge, { variant: "warning" }, "Pending"),
+  },
+];
+
+function DraggableColumnsDemo() {
+  const [columnOrder, setColumnOrder] = React.useState<string[]>(
+    dndMemberColumns.map((c) => c.id as string)
+  );
+  const [activeId, setActiveId] = React.useState<string | null>(null);
+  const [overId, setOverId] = React.useState<string | null>(null);
+  const [activeDelta, setActiveDelta] = React.useState(0);
+  const [noTransition, setNoTransition] = React.useState(false);
+  const headerRefs = React.useRef<Record<string, HTMLElement | null>>({});
+
+  // Compute how far each non-dragged column should shift to make room
+  const displacements = React.useMemo<Record<string, number>>(() => {
+    if (!activeId || !overId) return {};
+    const activeIdx = columnOrder.indexOf(activeId);
+    const overIdx = columnOrder.indexOf(overId);
+    if (activeIdx === overIdx) return {};
+    const activeWidth = headerRefs.current[activeId]?.offsetWidth ?? 0;
+    const result: Record<string, number> = {};
+    for (const id of columnOrder) {
+      if (id === activeId) continue;
+      const idx = columnOrder.indexOf(id);
+      if (activeIdx < overIdx && idx > activeIdx && idx <= overIdx)
+        result[id] = -activeWidth;
+      else if (activeIdx > overIdx && idx < activeIdx && idx >= overIdx)
+        result[id] = activeWidth;
+    }
+    return result;
+  }, [activeId, overId, columnOrder]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setNoTransition(true);
+    if (active && over && active.id !== over.id) {
+      setColumnOrder((order) => {
+        const oldIdx = order.indexOf(active.id as string);
+        const newIdx = order.indexOf(over.id as string);
+        return arrayMove(order, oldIdx, newIdx);
+      });
+    }
+    setActiveId(null);
+    setOverId(null);
+    setActiveDelta(0);
+    requestAnimationFrame(() => setNoTransition(false));
+  };
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: dndMembers,
+    columns: dndMemberColumns,
+    state: { columnOrder },
+    onColumnOrderChange: setColumnOrder,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={({ active }) => { setActiveId(active.id as string); setOverId(active.id as string); setActiveDelta(0); }}
+      onDragMove={({ delta }) => setActiveDelta(delta.x)}
+      onDragOver={({ over }) => setOverId(over?.id as string ?? null)}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => { setNoTransition(true); setActiveId(null); setOverId(null); setActiveDelta(0); requestAnimationFrame(() => setNoTransition(false)); }}
+    >
+      <div className="overflow-hidden rounded-md border [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                <SortableContext
+                  items={columnOrder}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  {headerGroup.headers.map((header) => (
+                    <DndSortableHeader
+                      key={header.id}
+                      header={header}
+                      transform={activeId === header.id ? activeDelta : (displacements[header.id] ?? 0)}
+                      isDragging={activeId === header.id}
+                      noTransition={noTransition}
+                      onRef={(el) => { headerRefs.current[header.id] = el; }}
+                    />
+                  ))}
+                </SortableContext>
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => {
+                  const dragging = activeId === cell.column.id;
+                  const tx = dragging ? activeDelta : (displacements[cell.column.id] ?? 0);
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      style={tx !== 0 || dragging ? {
+                        transform: `translateX(${tx}px)`,
+                        position: "relative",
+                        zIndex: dragging ? 10 : undefined,
+                        opacity: dragging ? 0.6 : 1,
+                        transition: (dragging || noTransition) ? "none" : "transform 100ms ease",
+                      } : undefined}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </DndContext>
+  );
+}
 
 // ─── Cell-border columns ──────────────────────────────────────────────────────
 
@@ -631,10 +898,8 @@ const autoWidthColumns: ColumnDef<Patient>[] = [
       React.createElement(
         "div",
         { className: "flex items-center gap-2" },
-        React.createElement(
-          "div",
-          { className: "flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary" },
-          getInitials(row.original.name)
+        React.createElement(Avatar, { shape: "rounded", size: "sm" },
+          React.createElement(AvatarFallback, { color: "primary" }, getInitials(row.original.name))
         ),
         React.createElement("span", { className: "font-medium whitespace-nowrap" }, row.original.name)
       ),
@@ -984,6 +1249,70 @@ const SubDataGridDemo = () =>
     renderExpandedRow: renderInvestigationSubTable,
   });
 
+// ─── Footer rows data & columns ───────────────────────────────────────────────
+
+const footerInvoiceColumns: ColumnDef<Invoice>[] = [
+  {
+    id: "patient",
+    accessorKey: "patientName",
+    header: "Patient",
+    footer: () => React.createElement("span", { className: "font-semibold" }, "Total"),
+    cell: ({ row }) => patientCell(row.original.patientName, row.original.patientId),
+  },
+  {
+    accessorKey: "date",
+    header: "Date",
+    footer: () => null,
+  },
+  {
+    accessorKey: "category",
+    header: "Category",
+    footer: () => null,
+    cell: ({ row }) => React.createElement(Badge, { variant: "neutral" }, row.getValue("category")),
+  },
+  {
+    accessorKey: "amount",
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "Amount" }),
+    footer: ({ table }) => {
+      const total = table
+        .getFilteredRowModel()
+        .rows.reduce((sum, row) => sum + (row.getValue("amount") as number), 0);
+      return React.createElement(
+        "span",
+        { className: "font-semibold tabular-nums" },
+        formatINR(total)
+      );
+    },
+    meta: { className: "text-right" },
+    cell: ({ row }) =>
+      React.createElement(
+        "div",
+        { className: "font-medium tabular-nums" },
+        formatINR(row.getValue("amount"))
+      ),
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    footer: () => null,
+    cell: ({ row }) =>
+      React.createElement(
+        Badge,
+        { variant: invoiceStatusVariant[row.getValue("status") as Invoice["status"]] },
+        row.getValue("status")
+      ),
+  },
+];
+
+const FooterRowsDemo = () =>
+  React.createElement(DataTable as any, {
+    columns: footerInvoiceColumns,
+    data: invoices,
+    filterColumn: "patientName",
+    filterPlaceholder: "Search by patient...",
+  });
+
 // ─── Column Icons columns ────────────────────────────────────────────────────────
 
 const columnIconColumns: ColumnDef<Patient>[] = [
@@ -1048,6 +1377,156 @@ const ColumnIconsDemo = () =>
     filterPlaceholder: "Search patients...",
   });
 
+// ─── Row Pinning demo ─────────────────────────────────────────────────────────
+
+const rowPinColumns: ColumnDef<Patient>[] = [
+  {
+    id: "pin",
+    enableHiding: false,
+    meta: { className: "w-0" },
+    header: () => null,
+    cell: ({ row }) => {
+      const isPinned = row.getIsPinned() === "top";
+      return React.createElement(
+        Button,
+        {
+          variant: "ghost",
+          size: "icon",
+          className: `size-7 ${isPinned ? "text-primary" : "text-muted-foreground"}`,
+          onClick: () => row.pin(isPinned ? false : "top"),
+          "aria-label": isPinned ? "Unpin row" : "Pin row to top",
+        } as any,
+        isPinned
+          ? React.createElement(PinOff, { className: "size-4" })
+          : React.createElement(Pin, { className: "size-4" })
+      );
+    },
+  },
+  {
+    id: "patient",
+    accessorKey: "name",
+    header: "Patient",
+    cell: ({ row }) => patientCell(row.original.name, row.original.id),
+  },
+  { accessorKey: "ward", header: "Ward" },
+  { accessorKey: "diagnosis", header: "Diagnosis" },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) =>
+      React.createElement(
+        Badge,
+        { variant: patientStatusVariant[row.getValue("status") as Patient["status"]] },
+        row.getValue("status")
+      ),
+  },
+];
+
+function RowPinningDemo() {
+  const [rowPinning, setRowPinning] = React.useState<RowPinningState>({ top: [], bottom: [] });
+  const [globalFilter, setGlobalFilter] = React.useState("");
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: patients,
+    columns: rowPinColumns,
+    state: { rowPinning, globalFilter },
+    onRowPinningChange: setRowPinning,
+    onGlobalFilterChange: setGlobalFilter,
+    enableRowPinning: true,
+    keepPinnedRows: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const pinnedRows = table.getTopRows();
+  const unpinnedRows = table.getCenterRows();
+
+  return React.createElement(
+    "div",
+    { className: "w-full space-y-0" },
+    React.createElement(
+      "div",
+      { className: "flex items-center gap-2 py-4" },
+      React.createElement("input", {
+        placeholder: "Search patients...",
+        value: globalFilter,
+        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setGlobalFilter(e.target.value),
+        className: "max-w-sm h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+      })
+    ),
+    React.createElement(
+      "div",
+      { className: "overflow-hidden rounded-md border" },
+      React.createElement(
+        Table,
+        null,
+        React.createElement(
+          TableHeader,
+          null,
+          table.getHeaderGroups().map((hg) =>
+            React.createElement(
+              TableRow,
+              { key: hg.id },
+              hg.headers.map((header) =>
+                React.createElement(
+                  TableHead,
+                  { key: header.id, className: header.column.columnDef.meta?.className },
+                  header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())
+                )
+              )
+            )
+          )
+        ),
+        React.createElement(
+          TableBody,
+          null,
+          pinnedRows.length > 0 &&
+            pinnedRows.map((row) =>
+              React.createElement(
+                TableRow,
+                { key: row.id, className: "bg-primary/5 font-medium sticky top-0 z-10" },
+                row.getVisibleCells().map((cell) =>
+                  React.createElement(
+                    TableCell,
+                    { key: cell.id, className: cell.column.columnDef.meta?.className },
+                    flexRender(cell.column.columnDef.cell, cell.getContext())
+                  )
+                )
+              )
+            ),
+          unpinnedRows.length > 0
+            ? unpinnedRows.map((row) =>
+                React.createElement(
+                  TableRow,
+                  { key: row.id },
+                  row.getVisibleCells().map((cell) =>
+                    React.createElement(
+                      TableCell,
+                      { key: cell.id, className: cell.column.columnDef.meta?.className },
+                      flexRender(cell.column.columnDef.cell, cell.getContext())
+                    )
+                  )
+                )
+              )
+            : React.createElement(
+                TableRow,
+                null,
+                React.createElement(
+                  TableCell,
+                  { colSpan: rowPinColumns.length, className: "h-24 text-center" },
+                  "No results."
+                )
+              )
+        )
+      )
+    )
+  );
+}
+
 // ─── ComponentDoc ─────────────────────────────────────────────────────────────
 
 export const dataTableDoc: ComponentDoc = {
@@ -1096,6 +1575,7 @@ export function PatientListPage() {
 import * as React from "react"
 import { type ColumnDef } from "@tanstack/react-table"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -1158,9 +1638,9 @@ export const columns: ColumnDef<Patient>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Patient" />,
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.name)}
-        </div>
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.name}</span>
           <span className="text-muted-foreground text-xs">{row.original.id}</span>
@@ -1169,7 +1649,7 @@ export const columns: ColumnDef<Patient>[] = [
     ),
   },
   {
-    id: "demographics",
+    id: "demographics",,
     header: "Age / Gender",
     cell: ({ row }) => (
       <span className="text-sm tabular-nums">
@@ -1239,6 +1719,7 @@ export function PatientListDemo() {
 
 import { Badge } from "@/components/ui/badge"
 import { DataTable } from "@/components/ui/data-table"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { type ColumnDef } from "@tanstack/react-table"
 
 type MedLog = {
@@ -1268,9 +1749,9 @@ const columns: ColumnDef<MedLog>[] = [
     header: "Patient",
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.patientName)}
-        </div>
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.patientName)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.patientName}</span>
           <span className="text-muted-foreground text-xs">{row.original.patientId}</span>
@@ -1332,6 +1813,7 @@ import {
   DataTableColumnHeader,
   DataTableRowActions,
 } from "@/components/ui/data-table"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -1378,9 +1860,9 @@ export const columns: ColumnDef<Invoice>[] = [
     header: "Patient",
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.patientName)}
-        </div>
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.patientName)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.patientName}</span>
           <span className="text-muted-foreground text-xs">{row.original.patientId}</span>
@@ -1454,6 +1936,7 @@ export function InvoiceTable() {
         "Staff directory with sortable name, department, designation, and experience columns. Click any column header to toggle ascending / descending order.",
       code: `"use client"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table"
 import { type ColumnDef } from "@tanstack/react-table"
@@ -1495,9 +1978,9 @@ const columns: ColumnDef<StaffMember>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Staff" />,
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.name)}
-        </div>
+        <Avatar shape="circle">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.name}</span>
           <span className="text-muted-foreground text-xs">{row.original.email}</span>
@@ -1553,6 +2036,7 @@ export function SortableStaffTable() {
         "Drag any column header left or right to reorder columns on the fly. Powered by the TanStack Table `columnOrder` state and native HTML5 drag-and-drop — no extra dependencies required.",
       code: `"use client"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table"
 import { type ColumnDef } from "@tanstack/react-table"
@@ -1594,9 +2078,9 @@ const columns: ColumnDef<StaffMember>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Staff" />,
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.name)}
-        </div>
+        <Avatar shape="circle">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.name}</span>
           <span className="text-muted-foreground text-xs">{row.original.email}</span>
@@ -1647,11 +2131,262 @@ export function MovableStaffTable() {
       preview: React.createElement(MovableColumnsDemo),
     },
     {
+      name: "Draggable Columns",
+      description:
+        "Drag column headers to reorder them using @dnd-kit. Each header shows a grip handle that users can grab to move columns left or right.",
+      code: `"use client"
+
+import React, { useMemo, useRef, useState } from "react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  arrayMove,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import {
+  type ColumnDef,
+  type Header,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import { GripVertical } from "lucide-react"
+
+type Member = {
+  id: string
+  name: string
+  avatar: string
+  email: string
+  company: string
+  role: string
+  status: "active" | "inactive"
+}
+
+const members: Member[] = [
+  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", email: "alex@apple.com",    company: "Apple",      role: "CEO",             status: "active"   },
+  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", email: "sarah@openai.com",  company: "OpenAI",     role: "CTO",             status: "inactive" },
+  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", email: "michael@meta.com",  company: "Meta",       role: "Designer",        status: "active"   },
+  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", email: "emma@tesla.com",    company: "Tesla",      role: "Developer",       status: "inactive" },
+  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", email: "david@sap.com",     company: "SAP",        role: "Lawyer",          status: "inactive" },
+  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", email: "aron@keen.com",     company: "Keenthemes", role: "Director",        status: "active"   },
+  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", email: "james@bbva.es",     company: "BBVA",       role: "Product Manager", status: "inactive" },
+  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", email: "maria@sony.jp",     company: "Sony",       role: "Marketing Lead",  status: "inactive" },
+  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", email: "nick@lvmh.fr",      company: "LVMH",       role: "Data Scientist",  status: "inactive" },
+  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", email: "liam@eni.it",       company: "ENI",        role: "Engineer",        status: "inactive" },
+  { id: "11", name: "Pooja Iyer",        avatar: "https://images.unsplash.com/photo-1619946794135-5bc917a27793?w=96&h=96&dpr=2&q=80", email: "pooja@tata.in",     company: "Tata",       role: "Sales Manager",   status: "active"   },
+]
+
+const columns: ColumnDef<Member>[] = [
+  {
+    id: "name",
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <Avatar shape="circle">
+          <AvatarImage src={row.original.avatar} alt={row.original.name} />
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
+        <span className="font-medium text-sm">{row.original.name}</span>
+      </div>
+    ),
+  },
+  { id: "email",   accessorKey: "email",   header: "Email",      cell: ({ row }) => <span className="text-muted-foreground text-sm">{row.original.email}</span> },
+  { id: "company", accessorKey: "company", header: "Company",    cell: ({ row }) => <span className="font-medium text-sm">{row.original.company}</span> },
+  { id: "role",    accessorKey: "role",    header: "Occupation", cell: ({ row }) => <span className="text-sm">{row.original.role}</span> },
+  {
+    id: "status",
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) =>
+      row.original.status === "active"
+        ? <Badge variant="success">Approved</Badge>
+        : <Badge variant="warning">Pending</Badge>,
+  },
+]
+
+function SortableColumnHeader({
+  header,
+  transform,
+  isDragging,
+  noTransition,
+  onRef,
+}: {
+  header: Header<Member, unknown>
+  transform: number
+  isDragging: boolean
+  noTransition: boolean
+  onRef: (el: HTMLElement | null) => void
+}) {
+  const { attributes, listeners, setNodeRef } = useSortable({ id: header.id })
+  return (
+    <TableHead
+      ref={(el) => { setNodeRef(el); onRef(el) }}
+      colSpan={header.colSpan}
+      style={{
+        opacity: isDragging ? 0.4 : 1,
+        transform: transform !== 0 ? \`translateX(\${transform}px)\` : undefined,
+        position: transform !== 0 || isDragging ? "relative" : undefined,
+        zIndex: isDragging ? 10 : undefined,
+        transition: (isDragging || noTransition) ? "none" : "transform 100ms ease",
+      }}
+    >
+      <div className="flex items-center gap-1">
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
+          aria-label="Drag to reorder column"
+        >
+          <GripVertical className="size-3.5" />
+        </button>
+        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+      </div>
+    </TableHead>
+  )
+}
+
+export function DraggableColumnsTable() {
+  const [columnOrder, setColumnOrder] = useState<string[]>(
+    columns.map((c) => c.id as string)
+  )
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+  const [activeDelta, setActiveDelta] = useState(0)
+  const [noTransition, setNoTransition] = useState(false)
+  const headerRefs = useRef<Record<string, HTMLElement | null>>({})
+
+  const displacements = useMemo<Record<string, number>>(() => {
+    if (!activeId || !overId) return {}
+    const activeIdx = columnOrder.indexOf(activeId)
+    const overIdx = columnOrder.indexOf(overId)
+    if (activeIdx === overIdx) return {}
+    const activeWidth = headerRefs.current[activeId]?.offsetWidth ?? 0
+    const result: Record<string, number> = {}
+    for (const id of columnOrder) {
+      if (id === activeId) continue
+      const idx = columnOrder.indexOf(id)
+      if (activeIdx < overIdx && idx > activeIdx && idx <= overIdx)
+        result[id] = -activeWidth
+      else if (activeIdx > overIdx && idx < activeIdx && idx >= overIdx)
+        result[id] = activeWidth
+    }
+    return result
+  }, [activeId, overId, columnOrder])
+
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor))
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    setNoTransition(true)
+    if (active && over && active.id !== over.id) {
+      setColumnOrder((order) => {
+        const oldIdx = order.indexOf(active.id as string)
+        const newIdx = order.indexOf(over.id as string)
+        return arrayMove(order, oldIdx, newIdx)
+      })
+    }
+    setActiveId(null)
+    setOverId(null)
+    setActiveDelta(0)
+    requestAnimationFrame(() => setNoTransition(false))
+  }
+
+  const table = useReactTable({
+    data: members,
+    columns,
+    state: { columnOrder },
+    onColumnOrderChange: setColumnOrder,
+    getCoreRowModel: getCoreRowModel(),
+  })
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={({ active }) => { setActiveId(active.id as string); setOverId(active.id as string); setActiveDelta(0) }}
+      onDragMove={({ delta }) => setActiveDelta(delta.x)}
+      onDragOver={({ over }) => setOverId(over?.id as string ?? null)}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => { setNoTransition(true); setActiveId(null); setOverId(null); setActiveDelta(0); requestAnimationFrame(() => setNoTransition(false)) }}
+    >
+      <div className="overflow-hidden rounded-md border [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                <SortableContext items={columnOrder} strategy={horizontalListSortingStrategy}>
+                  {headerGroup.headers.map((header) => (
+                    <SortableColumnHeader
+                      key={header.id}
+                      header={header}
+                      transform={activeId === header.id ? activeDelta : (displacements[header.id] ?? 0)}
+                      isDragging={activeId === header.id}
+                      noTransition={noTransition}
+                      onRef={(el) => { headerRefs.current[header.id] = el }}
+                    />
+                  ))}
+                </SortableContext>
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => {
+                  const dragging = activeId === cell.column.id
+                  const tx = dragging ? activeDelta : (displacements[cell.column.id] ?? 0)
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      style={tx !== 0 || dragging ? {
+                        transform: \`translateX(\${tx}px)\`,
+                        position: "relative",
+                        zIndex: dragging ? 10 : undefined,
+                        opacity: dragging ? 0.6 : 1,
+                        transition: (dragging || noTransition) ? "none" : "transform 100ms ease",
+                      } : undefined}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  )
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </DndContext>
+  )
+}`,
+      preview: React.createElement(DraggableColumnsDemo),
+    },
+    {
       name: "Cell Border",
       description:
         "Adds vertical borders between columns for a spreadsheet-like grid feel — useful for dense financial or clinical data tables.",
       code: `"use client"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table"
 import { type ColumnDef } from "@tanstack/react-table"
@@ -1673,9 +2408,9 @@ const columns: ColumnDef<Patient>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.name)}
-        </div>
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.name}</span>
           <span className="text-muted-foreground text-xs">{row.original.id}</span>
@@ -1728,6 +2463,7 @@ export function CellBorderTable() {
         "Compact row padding for high-density clinical views like vitals logs, lab results, or medication schedules where many rows need to be visible at once.",
       code: `"use client"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { DataTable } from "@/components/ui/data-table"
 import { type ColumnDef } from "@tanstack/react-table"
@@ -1749,9 +2485,9 @@ const columns: ColumnDef<Patient>[] = [
     header: "Name",
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.name)}
-        </div>
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.name}</span>
           <span className="text-muted-foreground text-xs">{row.original.id}</span>
@@ -1809,6 +2545,7 @@ export function DensePatientTable() {
         "Table columns size to their content instead of stretching to fill the container — ideal for compact reference tables where consistent column widths are not needed.",
       code: `"use client"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { DataTable } from "@/components/ui/data-table"
 import { type ColumnDef } from "@tanstack/react-table"
@@ -1830,9 +2567,9 @@ const columns: ColumnDef<Patient>[] = [
     header: "Name",
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
-        <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-          {getInitials(row.original.name)}
-        </div>
+        <Avatar shape="rounded" size="sm">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
         <span className="font-medium whitespace-nowrap">{row.original.name}</span>
       </div>
     ),
@@ -1892,6 +2629,7 @@ export function AutoWidthPatientTable() {
         "Rows expand inline to reveal additional detail — clinical notes, medications, or test results — without navigating away. Add a toggle column with row.getToggleExpandedHandler() and pass renderExpandedRow to DataTable.",
       code: `"use client"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable } from "@/components/ui/data-table"
@@ -1946,9 +2684,9 @@ const columns: ColumnDef<Patient>[] = [
     header: "Patient",
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.name)}
-        </div>
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.name}</span>
           <span className="text-muted-foreground text-xs">{row.original.id}</span>
@@ -2008,6 +2746,7 @@ export function ExpandablePatientTable() {
         "Expandable rows that reveal a fully functional nested DataTable — useful for master/detail views like patient encounters with lab investigations, orders with line items, or wards with bed assignments.",
       code: `"use client"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable } from "@/components/ui/data-table"
@@ -2118,9 +2857,9 @@ const encounterColumns: ColumnDef<PatientEncounter>[] = [
     header: "Patient",
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.patientName)}
-        </div>
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.patientName)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.patientName}</span>
           <span className="text-muted-foreground text-xs">{row.original.patientId}</span>
@@ -2178,11 +2917,116 @@ export function PatientEncounterTable() {
       preview: React.createElement(SubDataGridDemo),
     },
     {
+      name: "Footer Rows",
+      description:
+        "Add summary or total rows to the bottom of the table using TanStack Table footer definitions. The footer re-computes automatically when filters change.",
+      code: `"use client"
+
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table"
+import { type ColumnDef } from "@tanstack/react-table"
+
+type Invoice = {
+  id: string
+  patientName: string
+  patientId: string
+  date: string
+  category: string
+  amount: number
+  status: "paid" | "pending" | "overdue"
+}
+
+const statusVariant = {
+  paid:    "success",
+  pending: "warning",
+  overdue: "destructive",
+} as const
+
+const formatINR = (amount: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount)
+
+const getInitials = (name: string) =>
+  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+
+const columns: ColumnDef<Invoice>[] = [
+  {
+    id: "patient",
+    accessorKey: "patientName",
+    header: "Patient",
+    footer: () => <span className="font-semibold">Total</span>,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.patientName)}</AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col">
+          <span className="font-medium">{row.original.patientName}</span>
+          <span className="text-muted-foreground text-xs">{row.original.patientId}</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    accessorKey: "date",
+    header: "Date",
+    footer: () => null,
+  },
+  {
+    accessorKey: "category",
+    header: "Category",
+    footer: () => null,
+    cell: ({ row }) => <Badge variant="neutral">{row.getValue("category")}</Badge>,
+  },
+  {
+    accessorKey: "amount",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
+    footer: ({ table }) => {
+      const total = table
+        .getFilteredRowModel()
+        .rows.reduce((sum, row) => sum + (row.getValue("amount") as number), 0)
+      return <span className="font-semibold tabular-nums">{formatINR(total)}</span>
+    },
+    meta: { className: "text-right" },
+    cell: ({ row }) => (
+      <div className="font-medium tabular-nums">{formatINR(row.getValue("amount"))}</div>
+    ),
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    footer: () => null,
+    cell: ({ row }) => (
+      <Badge variant={statusVariant[row.getValue("status") as Invoice["status"]]}>
+        {row.getValue("status")}
+      </Badge>
+    ),
+  },
+]
+
+export function InvoiceTableWithFooter() {
+  return (
+    <DataTable
+      columns={columns}
+      data={invoices}
+      filterColumn="patientName"
+      filterPlaceholder="Search by patient..."
+    />
+  )
+}`,
+      preview: React.createElement(FooterRowsDemo),
+    },
+    {
       name: "Column Icons",
       description:
         "Add a leading icon to column headers by passing an icon node to DataTableColumnHeader \u2014 useful for visually distinguishing clinical data fields at a glance.",
       code: `"use client"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table"
 import { type ColumnDef } from "@tanstack/react-table"
@@ -2207,9 +3051,9 @@ const columns: ColumnDef<Patient>[] = [
     ),
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(row.original.name)}
-        </div>
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
         <div className="flex flex-col">
           <span className="font-medium">{row.original.name}</span>
           <span className="text-muted-foreground text-xs">{row.original.id}</span>
@@ -2259,6 +3103,183 @@ export function ColumnIconPatientTable() {
   )
 }`,
       preview: React.createElement(ColumnIconsDemo),
+    },
+    {
+      name: "Row Pinning",
+      description:
+        "Pin important rows to the top of the table so they stay visible while scrolling through the rest of the data. Click the pin icon on any row to toggle it. Uses TanStack Table's built-in row pinning with keepPinnedRows.",
+      code: `"use client"
+
+import React, { useState } from "react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  type ColumnDef,
+  type RowPinningState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import { Pin, PinOff } from "lucide-react"
+
+type Patient = {
+  id: string
+  name: string
+  ward: string
+  diagnosis: string
+  status: "admitted" | "critical" | "stable" | "discharged"
+}
+
+const patientStatusVariant = {
+  stable:     "success",
+  admitted:   "info",
+  critical:   "destructive",
+  discharged: "neutral",
+} as const
+
+const getInitials = (name: string) =>
+  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+
+const columns: ColumnDef<Patient>[] = [
+  {
+    id: "pin",
+    enableHiding: false,
+    meta: { className: "w-0" },
+    header: () => null,
+    cell: ({ row }) => {
+      const isPinned = row.getIsPinned() === "top"
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          className={\`size-7 \${isPinned ? "text-primary" : "text-muted-foreground"}\`}
+          onClick={() => row.pin(isPinned ? false : "top")}
+          aria-label={isPinned ? "Unpin row" : "Pin row to top"}
+        >
+          {isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
+        </Button>
+      )
+    },
+  },
+  {
+    id: "patient",
+    accessorKey: "name",
+    header: "Patient",
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col">
+          <span className="font-medium">{row.original.name}</span>
+          <span className="text-muted-foreground text-xs">{row.original.id}</span>
+        </div>
+      </div>
+    ),
+  },
+  { accessorKey: "ward", header: "Ward" },
+  { accessorKey: "diagnosis", header: "Diagnosis" },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => (
+      <Badge variant={patientStatusVariant[row.getValue("status") as Patient["status"]]}>
+        {row.getValue("status")}
+      </Badge>
+    ),
+  },
+]
+
+export function RowPinningTable() {
+  const [rowPinning, setRowPinning] = useState<RowPinningState>({ top: [], bottom: [] })
+  const [globalFilter, setGlobalFilter] = useState("")
+
+  const table = useReactTable({
+    data: patients,
+    columns,
+    state: { rowPinning, globalFilter },
+    onRowPinningChange: setRowPinning,
+    onGlobalFilterChange: setGlobalFilter,
+    enableRowPinning: true,
+    keepPinnedRows: true,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const pinnedRows = table.getTopRows()
+  const unpinnedRows = table.getCenterRows()
+
+  return (
+    <div className="w-full space-y-0">
+      <div className="flex items-center gap-2 py-4">
+        <input
+          placeholder="Search patients..."
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          className="max-w-sm h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
+      </div>
+      <div className="overflow-hidden rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((header) => (
+                  <TableHead key={header.id} className={header.column.columnDef.meta?.className}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {pinnedRows.length > 0 && pinnedRows.map((row) => (
+              <TableRow key={row.id} className="bg-primary/5 font-medium sticky top-0 z-10">
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className={cell.column.columnDef.meta?.className}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+            {unpinnedRows.length > 0 ? (
+              unpinnedRows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className={cell.column.columnDef.meta?.className}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )
+}`,
+      preview: React.createElement(RowPinningDemo),
     },
   ],
   props: [
@@ -2311,6 +3332,12 @@ export function ColumnIconPatientTable() {
       name: "hideToolbar",
       type: "boolean",
       description: "Hides the filter input and column visibility toolbar. Useful for nested sub-tables inside expanded rows.",
+      default: "false",
+    },
+    {
+      name: "movableColumns",
+      type: "boolean",
+      description: "Enables native HTML5 drag-and-drop column reordering. Drag any column header left or right to reorder.",
       default: "false",
     },
     {
