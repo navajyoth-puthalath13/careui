@@ -30,7 +30,7 @@ declare module "@tanstack/react-table" {
     className?: string;
   }
 }
-import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpDown, Check, ChevronDown, MoreHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+// ─── Column-move context (used by DataTableColumnHeader when movableColumns=true) ──
+
+interface DataTableMoveContextValue {
+  moveColumn: (id: string, direction: "left" | "right") => void;
+  columnOrder: string[];
+}
+
+const DataTableMoveContext =
+  React.createContext<DataTableMoveContextValue | null>(null);
 
 // ─── DataTable ────────────────────────────────────────────────────────────────
 
@@ -100,13 +110,35 @@ function DataTable<TData, TValue>({
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
-  const dragColumnId = React.useRef<string | null>(null);
   const [columnOrder, setColumnOrder] = React.useState<string[]>(() =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     columns.map((c) => (c as any).id ?? String((c as any).accessorKey))
   );
 
-  // eslint-disable-next-line react-hooks/incompatible-library
+  const moveColumn = React.useCallback(
+    (id: string, direction: "left" | "right") => {
+      setColumnOrder((prev) => {
+        const order = prev.length
+          ? [...prev]
+          : table.getAllLeafColumns().map((c) => c.id);
+        const idx = order.indexOf(id);
+        if (direction === "left" && idx > 0) {
+          const next = [...order];
+          [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+          return next;
+        }
+        if (direction === "right" && idx < order.length - 1) {
+          const next = [...order];
+          [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+          return next;
+        }
+        return order;
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   const table = useReactTable({
     data,
     columns,
@@ -136,7 +168,13 @@ function DataTable<TData, TValue>({
   const activeFilterColumn =
     filterColumn ?? table.getAllColumns().find((c) => c.getCanFilter())?.id;
 
+  const moveCtxValue = React.useMemo(
+    () => (movableColumns ? { moveColumn, columnOrder } : null),
+    [movableColumns, moveColumn, columnOrder]
+  );
+
   return (
+    <DataTableMoveContext.Provider value={moveCtxValue}>
     <div data-slot="data-table" className={cn("w-full", className)}>
       {/* Toolbar */}
       {!hideToolbar && (
@@ -157,7 +195,7 @@ function DataTable<TData, TValue>({
             className="max-w-sm"
           />
         )}
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
               Columns <ChevronDown />
@@ -200,26 +238,8 @@ function DataTable<TData, TValue>({
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    draggable={movableColumns || undefined}
-                    onDragStart={movableColumns ? () => { dragColumnId.current = header.id; } : undefined}
-                    onDragOver={movableColumns ? (e) => { e.preventDefault(); } : undefined}
-                    onDrop={movableColumns ? () => {
-                      const from = dragColumnId.current;
-                      dragColumnId.current = null;
-                      if (!from || from === header.id) return;
-                      setColumnOrder((prev) => {
-                        const order = prev.length ? [...prev] : table.getAllLeafColumns().map((c) => c.id);
-                        const fi = order.indexOf(from);
-                        const ti = order.indexOf(header.id);
-                        if (fi === -1 || ti === -1) return prev;
-                        order.splice(fi, 1);
-                        order.splice(ti, 0, from);
-                        return order;
-                      });
-                    } : undefined}
                     className={cn(
                       header.column.columnDef.meta?.className,
-                      movableColumns && "cursor-grab select-none",
                     )}
                   >
                     {header.isPlaceholder
@@ -325,6 +345,7 @@ function DataTable<TData, TValue>({
         </div>
       </div>
     </div>
+    </DataTableMoveContext.Provider>
   );
 }
 
@@ -342,7 +363,66 @@ function DataTableColumnHeader<TValue>({
   icon?: React.ReactNode;
   className?: string;
 }) {
-  if (!column.getCanSort()) {
+  const moveCtx = React.useContext(DataTableMoveContext);
+  const canSort = column.getCanSort();
+  const sorted = column.getIsSorted();
+
+  if (moveCtx) {
+    const { moveColumn, columnOrder } = moveCtx;
+    const idx = columnOrder.indexOf(column.id);
+    const isFirst = idx <= 0;
+    const isLast = idx >= columnOrder.length - 1;
+    const SortIcon =
+      sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ArrowUpDown;
+    return (
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className={cn(className)}>
+            {icon && (
+              <span className="shrink-0 text-muted-foreground [&_svg]:size-3.5">
+                {icon}
+              </span>
+            )}
+            {title}
+            <SortIcon className="ml-2" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {canSort && (
+            <>
+              <DropdownMenuItem onClick={() => column.toggleSorting(false)}>
+                <ArrowUp className="size-3.5 text-muted-foreground" />
+                Asc
+                {sorted === "asc" && <Check className="ml-auto size-3.5" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => column.toggleSorting(true)}>
+                <ArrowDown className="size-3.5 text-muted-foreground" />
+                Desc
+                {sorted === "desc" && <Check className="ml-auto size-3.5" />}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          <DropdownMenuItem
+            onClick={() => moveColumn(column.id, "left")}
+            disabled={isFirst}
+          >
+            <ArrowLeft className="size-3.5 text-muted-foreground" />
+            Move to Left
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => moveColumn(column.id, "right")}
+            disabled={isLast}
+          >
+            <ArrowRight className="size-3.5 text-muted-foreground" />
+            Move to Right
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  if (!canSort) {
     return (
       <div className={cn("flex items-center gap-1.5", className)}>
         {icon && <span className="shrink-0 text-muted-foreground [&_svg]:size-3.5">{icon}</span>}
@@ -356,7 +436,7 @@ function DataTableColumnHeader<TValue>({
       variant="ghost"
       size="sm"
       className={cn(className)}
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      onClick={() => column.toggleSorting(sorted === "asc")}
     >
       {icon && <span className="shrink-0 text-muted-foreground [&_svg]:size-3.5">{icon}</span>}
       {title}
@@ -373,7 +453,7 @@ interface DataTableRowActionsProps {
 
 function DataTableRowActions({ children }: DataTableRowActionsProps) {
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="size-10 p-0">
           <span className="sr-only">Open menu</span>

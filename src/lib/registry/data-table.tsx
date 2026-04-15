@@ -4,11 +4,9 @@ import {
   DataTable,
   DataTableColumnHeader,
   DataTableRowActions,
-} from "@/components/ui/data-table";
-import {
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/ui/data-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -1582,11 +1580,9 @@ import {
   DataTable,
   DataTableColumnHeader,
   DataTableRowActions,
-} from "@/components/ui/data-table"
-import {
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/data-table"
 
 type Patient = {
   id: string      // "OHC-0041"
@@ -1812,12 +1808,10 @@ import {
   DataTable,
   DataTableColumnHeader,
   DataTableRowActions,
-} from "@/components/ui/data-table"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/data-table"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { type ColumnDef } from "@tanstack/react-table"
 
 type Invoice = {
@@ -2033,7 +2027,7 @@ export function SortableStaffTable() {
     {
       name: "Movable Columns",
       description:
-        "Drag any column header left or right to reorder columns on the fly. Powered by the TanStack Table `columnOrder` state and native HTML5 drag-and-drop — no extra dependencies required.",
+        "Click any column header to open a dropdown with sort options (Asc / Desc) and column reordering actions (Move to Left, Move to Right). Powered by TanStack Table's `columnOrder` state — no extra dependencies required.",
       code: `"use client"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -3337,7 +3331,7 @@ export function RowPinningTable() {
     {
       name: "movableColumns",
       type: "boolean",
-      description: "Enables native HTML5 drag-and-drop column reordering. Drag any column header left or right to reorder.",
+      description: "Enables column reordering via a header dropdown menu. Each `DataTableColumnHeader` exposes Asc / Desc sort options and Move to Left / Move to Right actions.",
       default: "false",
     },
     {
