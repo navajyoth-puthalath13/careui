@@ -10,11 +10,14 @@ import * as React from "react";
 import {
   type ColumnDef,
   type ColumnFiltersState,
+  type ExpandedState,
+  type Row,
   type RowData,
   type SortingState,
   type VisibilityState,
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
@@ -60,6 +63,18 @@ interface DataTableProps<TData, TValue> {
   filterColumn?: string;
   /** Placeholder for the filter input */
   filterPlaceholder?: string;
+  /** Show vertical borders between cells */
+  cellBorder?: boolean;
+  /** Reduce cell padding for a compact layout */
+  dense?: boolean;
+  /** Let columns size to their content instead of stretching to full width */
+  autoWidth?: boolean;
+  /** Render expanded content below a row. Pair with a toggle column that calls row.getToggleExpandedHandler(). */
+  renderExpandedRow?: (row: Row<TData>) => React.ReactNode;
+  /** Hide the filter/column toolbar. Useful for nested sub-tables. */
+  hideToolbar?: boolean;
+  /** Allow columns to be reordered by dragging their headers. */
+  movableColumns?: boolean;
   className?: string;
 }
 
@@ -68,6 +83,12 @@ function DataTable<TData, TValue>({
   data,
   filterColumn,
   filterPlaceholder = "Filter...",
+  cellBorder = false,
+  dense = false,
+  autoWidth = false,
+  renderExpandedRow,
+  hideToolbar = false,
+  movableColumns = false,
   className,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -77,6 +98,12 @@ function DataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+  const [expanded, setExpanded] = React.useState<ExpandedState>({});
+  const dragColumnId = React.useRef<string | null>(null);
+  const [columnOrder, setColumnOrder] = React.useState<string[]>(() =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    columns.map((c) => (c as any).id ?? String((c as any).accessorKey))
+  );
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -88,13 +115,19 @@ function DataTable<TData, TValue>({
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    onExpandedChange: setExpanded,
+    getRowCanExpand: renderExpandedRow ? () => true : undefined,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    ...(movableColumns && { onColumnOrderChange: setColumnOrder }),
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
+      expanded,
+      ...(movableColumns && { columnOrder }),
     },
   });
 
@@ -105,6 +138,7 @@ function DataTable<TData, TValue>({
   return (
     <div data-slot="data-table" className={cn("w-full", className)}>
       {/* Toolbar */}
+      {!hideToolbar && (
       <div className="flex items-center gap-2 py-4">
         {activeFilterColumn && (
           <Input
@@ -147,17 +181,44 @@ function DataTable<TData, TValue>({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      )}
 
       {/* Table */}
-      <div className="overflow-hidden rounded-md border">
+      <div className={cn(
+        "overflow-hidden rounded-md border",
+        cellBorder && "[&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r",
+        dense && "[&_td]:py-1.5 [&_th]:h-8 [&_th]:py-0",
+        autoWidth && "w-fit [&_table]:w-auto"
+      )}>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
+                {headerGroup.headers.map((header, index) => (
                   <TableHead
                     key={header.id}
-                    className={cn(header.column.columnDef.meta?.className)}
+                    draggable={movableColumns || undefined}
+                    onDragStart={movableColumns ? () => { dragColumnId.current = header.id; } : undefined}
+                    onDragOver={movableColumns ? (e) => { e.preventDefault(); } : undefined}
+                    onDrop={movableColumns ? () => {
+                      const from = dragColumnId.current;
+                      dragColumnId.current = null;
+                      if (!from || from === header.id) return;
+                      setColumnOrder((prev) => {
+                        const order = prev.length ? [...prev] : table.getAllLeafColumns().map((c) => c.id);
+                        const fi = order.indexOf(from);
+                        const ti = order.indexOf(header.id);
+                        if (fi === -1 || ti === -1) return prev;
+                        order.splice(fi, 1);
+                        order.splice(ti, 0, from);
+                        return order;
+                      });
+                    } : undefined}
+                    className={cn(
+                      header.column.columnDef.meta?.className,
+                      index === 0 && "**:data-[slot=button]:-ml-1.5",
+                      movableColumns && "cursor-grab select-none",
+                    )}
                   >
                     {header.isPlaceholder
                       ? null
@@ -173,22 +234,30 @@ function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className={cn(cell.column.columnDef.meta?.className)}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                <React.Fragment key={row.id}>
+                  <TableRow
+                    data-state={row.getIsSelected() && "selected"}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        className={cn(cell.column.columnDef.meta?.className)}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  {row.getIsExpanded() && renderExpandedRow && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={row.getVisibleCells().length} className="p-0">
+                        {renderExpandedRow(row)}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               ))
             ) : (
               <TableRow>
@@ -238,24 +307,32 @@ function DataTable<TData, TValue>({
 function DataTableColumnHeader<TValue>({
   column,
   title,
+  icon,
   className,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   column: import("@tanstack/react-table").Column<any, TValue>;
   title: string;
+  icon?: React.ReactNode;
   className?: string;
 }) {
   if (!column.getCanSort()) {
-    return <div className={cn(className)}>{title}</div>;
+    return (
+      <div className={cn("flex items-center gap-1.5", className)}>
+        {icon && <span className="shrink-0 text-muted-foreground [&_svg]:size-3.5">{icon}</span>}
+        {title}
+      </div>
+    );
   }
 
   return (
     <Button
       variant="ghost"
       size="sm"
-      className={cn("-ml-3 h-8", className)}
+      className={cn("-ml-3", className)}
       onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
     >
+      {icon && <span className="shrink-0 text-muted-foreground [&_svg]:size-3.5">{icon}</span>}
       {title}
       <ArrowUpDown className="ml-2" />
     </Button>
