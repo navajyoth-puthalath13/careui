@@ -23,14 +23,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-
-declare module "@tanstack/react-table" {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface ColumnMeta<TData extends RowData, TValue> {
-    className?: string;
-  }
-}
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpDown, Check, ChevronDown, MoreHorizontal } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpDown, Check, ChevronDown, MoreHorizontal, Pin, PinOff } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -55,6 +48,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    className?: string;
+  }
+}
+
 // ─── Column-move context (used by DataTableColumnHeader when movableColumns=true) ──
 
 interface DataTableMoveContextValue {
@@ -64,6 +64,10 @@ interface DataTableMoveContextValue {
 
 const DataTableMoveContext =
   React.createContext<DataTableMoveContextValue | null>(null);
+
+// ─── Column-pin context (used by DataTableColumnHeader when pinnable=true) ──────
+
+const DataTablePinContext = React.createContext<boolean>(false);
 
 // ─── DataTable ────────────────────────────────────────────────────────────────
 
@@ -364,6 +368,7 @@ function DataTableColumnHeader<TValue>({
   className?: string;
 }) {
   const moveCtx = React.useContext(DataTableMoveContext);
+  const pinCtx = React.useContext(DataTablePinContext);
   const canSort = column.getCanSort();
   const sorted = column.getIsSorted();
 
@@ -417,6 +422,68 @@ function DataTableColumnHeader<TValue>({
             <ArrowRight className="size-3.5 text-muted-foreground" />
             Move to Right
           </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  if (pinCtx) {
+    const isPinned = column.getIsPinned();
+    const SortIcon = sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ArrowUpDown;
+    const TrailingIcon = isPinned
+      ? <Pin className="ml-2 size-3 text-primary" />
+      : canSort
+        ? <SortIcon className="ml-2" />
+        : null;
+    return (
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className={cn(className)}>
+            {icon && (
+              <span className="shrink-0 text-muted-foreground [&_svg]:size-3.5">
+                {icon}
+              </span>
+            )}
+            {title}
+            {TrailingIcon}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {canSort && (
+            <>
+              <DropdownMenuItem onClick={() => column.toggleSorting(false)}>
+                <ArrowUp className="size-3.5 text-muted-foreground" />
+                Asc
+                {sorted === "asc" && <Check className="ml-auto size-3.5" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => column.toggleSorting(true)}>
+                <ArrowDown className="size-3.5 text-muted-foreground" />
+                Desc
+                {sorted === "desc" && <Check className="ml-auto size-3.5" />}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          <DropdownMenuItem
+            onClick={() => column.pin("left")}
+            disabled={isPinned === "left"}
+          >
+            <Pin className="size-3.5 text-muted-foreground" />
+            Pin to Left
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => column.pin("right")}
+            disabled={isPinned === "right"}
+          >
+            <Pin className="size-3.5 text-muted-foreground -scale-x-100" />
+            Pin to Right
+          </DropdownMenuItem>
+          {isPinned && (
+            <DropdownMenuItem onClick={() => column.pin(false)}>
+              <PinOff className="size-3.5 text-muted-foreground" />
+              Unpin
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -480,6 +547,7 @@ function DataTableRowActions({ children }: DataTableRowActionsProps) {
 export {
   DataTable,
   DataTableColumnHeader,
+  DataTablePinContext,
   DataTableRowActions,
   DropdownMenuItem,
   DropdownMenuSeparator,

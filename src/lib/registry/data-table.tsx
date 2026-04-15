@@ -3,6 +3,7 @@ import { type ComponentDoc } from "@/lib/types";
 import {
   DataTable,
   DataTableColumnHeader,
+  DataTablePinContext,
   DataTableRowActions,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -14,11 +15,14 @@ import { Button } from "@/components/ui/button";
 import {
   type ColumnDef,
   type Header,
+  type PaginationState,
   type Row,
   type RowPinningState,
+  type SortingState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
@@ -547,21 +551,22 @@ type DndMember = {
   email: string;
   company: string;
   role: string;
+  location: string;
   status: "active" | "inactive";
 };
 
 const dndMembers: DndMember[] = [
-  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", email: "alex@apple.com",    company: "Apple",      role: "CEO",             status: "active"   },
-  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", email: "sarah@openai.com",  company: "OpenAI",     role: "CTO",             status: "inactive" },
-  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", email: "michael@meta.com",  company: "Meta",       role: "Designer",        status: "active"   },
-  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", email: "emma@tesla.com",    company: "Tesla",      role: "Developer",       status: "inactive" },
-  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", email: "david@sap.com",     company: "SAP",        role: "Lawyer",          status: "inactive" },
-  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", email: "aron@keen.com",     company: "Keenthemes", role: "Director",        status: "active"   },
-  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", email: "james@bbva.es",     company: "BBVA",       role: "Product Manager", status: "inactive" },
-  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", email: "maria@sony.jp",     company: "Sony",       role: "Marketing Lead",  status: "inactive" },
-  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", email: "nick@lvmh.fr",      company: "LVMH",       role: "Data Scientist",  status: "inactive" },
-  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", email: "liam@eni.it",       company: "ENI",        role: "Engineer",        status: "inactive" },
-  { id: "11", name: "Pooja Iyer",        avatar: "https://images.unsplash.com/photo-1619946794135-5bc917a27793?w=96&h=96&dpr=2&q=80", email: "pooja@tata.in",     company: "Tata",       role: "Sales Manager",   status: "active"   },
+  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", email: "alex@apple.com",    company: "Apple",      role: "CEO",             location: "United States",  status: "active"   },
+  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", email: "sarah@openai.com",  company: "OpenAI",     role: "CTO",             location: "United Kingdom", status: "inactive" },
+  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", email: "michael@meta.com",  company: "Meta",       role: "Designer",        location: "Canada",         status: "active"   },
+  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", email: "emma@tesla.com",    company: "Tesla",      role: "Developer",       location: "Australia",      status: "inactive" },
+  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", email: "david@sap.com",     company: "SAP",        role: "Lawyer",          location: "Germany",        status: "inactive" },
+  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", email: "aron@keen.com",     company: "Keenthemes", role: "Director",        location: "Malaysia",       status: "active"   },
+  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", email: "james@bbva.es",     company: "BBVA",       role: "Product Manager", location: "Spain",          status: "inactive" },
+  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", email: "maria@sony.jp",     company: "Sony",       role: "Marketing Lead",  location: "Japan",          status: "inactive" },
+  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", email: "nick@lvmh.fr",      company: "LVMH",       role: "Data Scientist",  location: "France",         status: "inactive" },
+  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", email: "liam@eni.it",       company: "ENI",        role: "Engineer",        location: "Italy",          status: "inactive" },
+  { id: "11", name: "Pooja Iyer",        avatar: "https://images.unsplash.com/photo-1619946794135-5bc917a27793?w=96&h=96&dpr=2&q=80", email: "pooja@tata.in",     company: "Tata",       role: "Sales Manager",   location: "India",          status: "active"   },
 ];
 
 function DndSortableHeader({
@@ -777,6 +782,258 @@ function DraggableColumnsDemo() {
         </Table>
       </div>
     </DndContext>
+  );
+}
+
+// ─── Resizable columns demo ───────────────────────────────────────────────────
+
+const resizableColumns: ColumnDef<DndMember>[] = [
+  {
+    id: "name",
+    accessorKey: "name",
+    header: "Staff",
+    size: 280,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <Avatar shape="circle">
+          <AvatarImage src={row.original.avatar} alt={row.original.name} />
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col">
+          <span className="font-medium text-sm">{row.original.name}</span>
+          <span className="text-muted-foreground text-xs">{row.original.email}</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "company",
+    accessorKey: "company",
+    header: "Company",
+    size: 160,
+    cell: ({ row }) => <span className="font-medium text-sm">{row.original.company}</span>,
+  },
+  {
+    id: "role",
+    accessorKey: "role",
+    header: "Occupation",
+    size: 160,
+    cell: ({ row }) => <span className="text-sm">{row.original.role}</span>,
+  },
+  {
+    id: "status",
+    accessorKey: "status",
+    header: "Status",
+    size: 120,
+    enableResizing: false,
+    cell: ({ row }) =>
+      row.original.status === "active"
+        ? <Badge variant="success">Approved</Badge>
+        : <Badge variant="warning">Pending</Badge>,
+  },
+];
+
+function ResizableColumnsDemo() {
+  const table = useReactTable({
+    data: dndMembers,
+    columns: resizableColumns,
+    columnResizeMode: "onChange",
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <div className="overflow-x-auto overflow-hidden rounded-md border [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r">
+      <Table style={{ width: table.getTotalSize() }}>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <TableHead
+                  key={header.id}
+                  style={{ width: header.getSize() }}
+                  className="relative overflow-hidden"
+                >
+                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  {header.column.getCanResize() && (
+                    <div
+                      onMouseDown={header.getResizeHandler()}
+                      onTouchStart={header.getResizeHandler()}
+                      className={`absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none transition-colors ${
+                        header.column.getIsResizing() ? "bg-primary" : "bg-transparent hover:bg-border"
+                      }`}
+                    />
+                  )}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// ─── Pinnable columns demo ───────────────────────────────────────────────────
+
+const pinnableColumns: ColumnDef<DndMember>[] = [
+  {
+    id: "name",
+    accessorKey: "name",
+    enableSorting: true,
+    enableHiding: false,
+    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Name" />,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <Avatar shape="circle">
+          <AvatarImage src={row.original.avatar} alt={row.original.name} />
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
+        <span className="font-medium text-sm whitespace-nowrap">{row.original.name}</span>
+      </div>
+    ),
+  },
+  {
+    id: "email",
+    accessorKey: "email",
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Email" />,
+    cell: ({ row }) => <span className="text-muted-foreground text-sm whitespace-nowrap">{row.original.email}</span>,
+  },
+  {
+    id: "company",
+    accessorKey: "company",
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Company" />,
+    cell: ({ row }) => <span className="font-medium text-sm whitespace-nowrap">{row.original.company}</span>,
+  },
+  {
+    id: "role",
+    accessorKey: "role",
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Occupation" />,
+    cell: ({ row }) => <span className="text-sm whitespace-nowrap">{row.original.role}</span>,
+  },
+  {
+    id: "location",
+    accessorKey: "location",
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Location" />,
+    cell: ({ row }) => <span className="text-sm whitespace-nowrap">{row.original.location}</span>,
+  },
+  {
+    id: "status",
+    accessorKey: "status",
+    enableSorting: false,
+    header: "Status",
+    cell: ({ row }) =>
+      row.original.status === "active"
+        ? <Badge variant="success">Approved</Badge>
+        : <Badge variant="warning">Pending</Badge>,
+  },
+];
+
+function PinnableColumnsDemo() {
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  });
+
+  const table = useReactTable({
+    data: dndMembers,
+    columns: pinnableColumns,
+    state: { sorting, pagination },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    initialState: {
+      columnPinning: { left: ["name"] },
+    },
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  return (
+    <DataTablePinContext.Provider value={true}>
+      <div className="flex flex-col gap-4 w-full">
+        <div className="overflow-x-auto rounded-md border [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r">
+          <Table className="w-max">
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    const isPinned = header.column.getIsPinned();
+                    return (
+                      <TableHead
+                        key={header.id}
+                        style={isPinned ? {
+                          position: "sticky",
+                          left: isPinned === "left" ? header.column.getStart("left") : undefined,
+                          right: isPinned === "right" ? header.column.getAfter("right") : undefined,
+                          zIndex: 1,
+                          boxShadow: isPinned === "left" ? "inset -1px 0 0 0 var(--border)" : "inset 1px 0 0 0 var(--border)",
+                        } : undefined}
+                        className={isPinned ? "bg-background" : ""}
+                      >
+                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => {
+                    const isPinned = cell.column.getIsPinned();
+                    return (
+                      <TableCell
+                        key={cell.id}
+                        style={isPinned ? {
+                          position: "sticky",
+                          left: isPinned === "left" ? cell.column.getStart("left") : undefined,
+                          right: isPinned === "right" ? cell.column.getAfter("right") : undefined,
+                          zIndex: 1,
+                          boxShadow: isPinned === "left" ? "inset -1px 0 0 0 var(--border)" : "inset 1px 0 0 0 var(--border)",
+                        } : undefined}
+                        className={isPinned ? "bg-background" : ""}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+              Previous
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+              Next
+            </Button>
+          </div>
+        </div>
+      </div>
+    </DataTablePinContext.Provider>
   );
 }
 
@@ -2373,6 +2630,341 @@ export function DraggableColumnsTable() {
   )
 }`,
       preview: React.createElement(DraggableColumnsDemo),
+    },
+    {
+      name: "Resizable Columns",
+      description:
+        "Drag the edge of any column header to resize it. Set `enableResizing: false` on a column to lock its width. Uses TanStack Table's built-in `columnResizeMode: \"onChange\"` — no extra dependencies required.",
+      code: `"use client"
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  type ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+type Member = {
+  id: string
+  name: string
+  avatar: string
+  email: string
+  company: string
+  role: string
+  status: "active" | "inactive"
+}
+
+const members: Member[] = [
+  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", email: "alex@apple.com",    company: "Apple",      role: "CEO",             status: "active"   },
+  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", email: "sarah@openai.com",  company: "OpenAI",     role: "CTO",             status: "inactive" },
+  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", email: "michael@meta.com",  company: "Meta",       role: "Designer",        status: "active"   },
+  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", email: "emma@tesla.com",    company: "Tesla",      role: "Developer",       status: "inactive" },
+  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", email: "david@sap.com",     company: "SAP",        role: "Lawyer",          status: "inactive" },
+  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", email: "aron@keen.com",     company: "Keenthemes", role: "Director",        status: "active"   },
+  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", email: "james@bbva.es",     company: "BBVA",       role: "Product Manager", status: "inactive" },
+  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", email: "maria@sony.jp",     company: "Sony",       role: "Marketing Lead",  status: "inactive" },
+  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", email: "nick@lvmh.fr",      company: "LVMH",       role: "Data Scientist",  status: "inactive" },
+  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", email: "liam@eni.it",       company: "ENI",        role: "Engineer",        status: "inactive" },
+  { id: "11", name: "Pooja Iyer",        avatar: "https://images.unsplash.com/photo-1619946794135-5bc917a27793?w=96&h=96&dpr=2&q=80", email: "pooja@tata.in",     company: "Tata",       role: "Sales Manager",   status: "active"   },
+]
+
+const getInitials = (name: string) =>
+  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+
+const columns: ColumnDef<Member>[] = [
+  {
+    id: "name",
+    accessorKey: "name",
+    header: "Staff",
+    size: 280,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <Avatar shape="circle">
+          <AvatarImage src={row.original.avatar} alt={row.original.name} />
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col">
+          <span className="font-medium text-sm">{row.original.name}</span>
+          <span className="text-muted-foreground text-xs">{row.original.email}</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "company",
+    accessorKey: "company",
+    header: "Company",
+    size: 160,
+    cell: ({ row }) => <span className="font-medium text-sm">{row.original.company}</span>,
+  },
+  {
+    id: "role",
+    accessorKey: "role",
+    header: "Occupation",
+    size: 160,
+    cell: ({ row }) => <span className="text-sm">{row.original.role}</span>,
+  },
+  {
+    id: "status",
+    accessorKey: "status",
+    header: "Status",
+    size: 120,
+    enableResizing: false,
+    cell: ({ row }) =>
+      row.original.status === "active"
+        ? <Badge variant="success">Approved</Badge>
+        : <Badge variant="warning">Pending</Badge>,
+  },
+]
+
+export function ResizableColumnsTable() {
+  const table = useReactTable({
+    data: members,
+    columns,
+    columnResizeMode: "onChange",
+    getCoreRowModel: getCoreRowModel(),
+  })
+
+  return (
+    <div className="overflow-x-auto overflow-hidden rounded-md border [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r">
+      <Table style={{ width: table.getTotalSize() }}>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <TableHead
+                  key={header.id}
+                  style={{ width: header.getSize() }}
+                  className="relative overflow-hidden"
+                >
+                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  {header.column.getCanResize() && (
+                    <div
+                      onMouseDown={header.getResizeHandler()}
+                      onTouchStart={header.getResizeHandler()}
+                      className={\`absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none transition-colors \${
+                        header.column.getIsResizing() ? "bg-primary" : "bg-transparent hover:bg-border"
+                      }\`}
+                    />
+                  )}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}`,
+      preview: React.createElement(ResizableColumnsDemo),
+    },
+    {
+      name: "Pinnable Columns",
+      description:
+        "Click the pin icon in any column header to stick it to the left edge while the rest of the table scrolls. Click the filled pin to unpin. The Name column is pinned by default. Columns are sortable and the table is paginated.",
+      code: `"use client"
+
+import { useState } from "react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { DataTableColumnHeader, DataTablePinContext } from "@/components/ui/data-table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  type ColumnDef,
+  type PaginationState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+type Member = {
+  id: string
+  name: string
+  avatar: string
+  email: string
+  company: string
+  role: string
+  location: string
+  status: "active" | "inactive"
+}
+
+const members: Member[] = [
+  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", email: "alex@apple.com",    company: "Apple",      role: "CEO",             location: "United States",  status: "active"   },
+  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", email: "sarah@openai.com",  company: "OpenAI",     role: "CTO",             location: "United Kingdom", status: "inactive" },
+  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", email: "michael@meta.com",  company: "Meta",       role: "Designer",        location: "Canada",         status: "active"   },
+  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", email: "emma@tesla.com",    company: "Tesla",      role: "Developer",       location: "Australia",      status: "inactive" },
+  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", email: "david@sap.com",     company: "SAP",        role: "Lawyer",          location: "Germany",        status: "inactive" },
+  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", email: "aron@keen.com",     company: "Keenthemes", role: "Director",        location: "Malaysia",       status: "active"   },
+  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", email: "james@bbva.es",     company: "BBVA",       role: "Product Manager", location: "Spain",          status: "inactive" },
+  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", email: "maria@sony.jp",     company: "Sony",       role: "Marketing Lead",  location: "Japan",          status: "inactive" },
+  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", email: "nick@lvmh.fr",      company: "LVMH",       role: "Data Scientist",  location: "France",         status: "inactive" },
+  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", email: "liam@eni.it",       company: "ENI",        role: "Engineer",        location: "Italy",          status: "inactive" },
+  { id: "11", name: "Pooja Iyer",        avatar: "https://images.unsplash.com/photo-1619946794135-5bc917a27793?w=96&h=96&dpr=2&q=80", email: "pooja@tata.in",     company: "Tata",       role: "Sales Manager",   location: "India",          status: "active"   },
+]
+
+const getInitials = (name: string) =>
+  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+
+const columns: ColumnDef<Member>[] = [
+  {
+    id: "name",
+    accessorKey: "name",
+    enableSorting: true,
+    enableHiding: false,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <Avatar shape="circle">
+          <AvatarImage src={row.original.avatar} alt={row.original.name} />
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
+        <span className="font-medium text-sm whitespace-nowrap">{row.original.name}</span>
+      </div>
+    ),
+  },
+  { id: "email",    accessorKey: "email",    enableSorting: true,  header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,      cell: ({ row }) => <span className="text-muted-foreground text-sm whitespace-nowrap">{row.original.email}</span> },
+  { id: "company",  accessorKey: "company",  enableSorting: true,  header: ({ column }) => <DataTableColumnHeader column={column} title="Company" />,    cell: ({ row }) => <span className="font-medium text-sm whitespace-nowrap">{row.original.company}</span> },
+  { id: "role",     accessorKey: "role",     enableSorting: true,  header: ({ column }) => <DataTableColumnHeader column={column} title="Occupation" />, cell: ({ row }) => <span className="text-sm whitespace-nowrap">{row.original.role}</span> },
+  { id: "location", accessorKey: "location", enableSorting: true,  header: ({ column }) => <DataTableColumnHeader column={column} title="Location" />,   cell: ({ row }) => <span className="text-sm whitespace-nowrap">{row.original.location}</span> },
+  {
+    id: "status",
+    accessorKey: "status",
+    enableSorting: false,
+    header: "Status",
+    cell: ({ row }) =>
+      row.original.status === "active"
+        ? <Badge variant="success">Approved</Badge>
+        : <Badge variant="warning">Pending</Badge>,
+  },
+]
+
+export function PinnableColumnsTable() {
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  })
+
+  const table = useReactTable({
+    data: members,
+    columns,
+    state: { sorting, pagination },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    initialState: {
+      columnPinning: { left: ["name"] },
+    },
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  })
+
+  return (
+    <DataTablePinContext.Provider value={true}>
+      <div className="flex flex-col gap-4 w-full">
+        <div className="overflow-x-auto rounded-md border [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r">
+          <Table className="w-max">
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    const isPinned = header.column.getIsPinned()
+                    return (
+                      <TableHead
+                        key={header.id}
+                        style={isPinned ? {
+                          position: "sticky",
+                          left: isPinned === "left" ? header.column.getStart("left") : undefined,
+                          right: isPinned === "right" ? header.column.getAfter("right") : undefined,
+                          zIndex: 1,
+                          boxShadow: isPinned === "left" ? "inset -1px 0 0 0 var(--border)" : "inset 1px 0 0 0 var(--border)",
+                        } : undefined}
+                        className={isPinned ? "bg-background" : ""}
+                      >
+                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    )
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => {
+                    const isPinned = cell.column.getIsPinned()
+                    return (
+                      <TableCell
+                        key={cell.id}
+                        style={isPinned ? {
+                          position: "sticky",
+                          left: isPinned === "left" ? cell.column.getStart("left") : undefined,
+                          right: isPinned === "right" ? cell.column.getAfter("right") : undefined,
+                          zIndex: 1,
+                          boxShadow: isPinned === "left" ? "inset -1px 0 0 0 var(--border)" : "inset 1px 0 0 0 var(--border)",
+                        } : undefined}
+                        className={isPinned ? "bg-background" : ""}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    )
+                  })}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+              Previous
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+              Next
+            </Button>
+          </div>
+        </div>
+      </div>
+    </DataTablePinContext.Provider>
+  )
+}`,
+
+      preview: React.createElement(PinnableColumnsDemo),
     },
     {
       name: "Cell Border",
