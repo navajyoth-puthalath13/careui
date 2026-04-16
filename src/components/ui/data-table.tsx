@@ -39,6 +39,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
   Table,
   TableBody,
   TableCell,
@@ -325,28 +333,43 @@ function DataTable<TData, TValue>({
 
       {/* Footer */}
       <div className="flex items-center justify-between py-4">
-        <div className="text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </Button>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {(() => {
+            const { pageIndex, pageSize } = table.getState().pagination;
+            const total = table.getFilteredRowModel().rows.length;
+            const start = total === 0 ? 0 : pageIndex * pageSize + 1;
+            const end = Math.min((pageIndex + 1) * pageSize, total);
+            return `${start} - ${end} of ${total}`;
+          })()}
+        </p>
+        <Pagination className="w-auto mx-0">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={(e) => { e.preventDefault(); table.previousPage(); }}
+                aria-disabled={!table.getCanPreviousPage()}
+                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+            {Array.from({ length: table.getPageCount() }, (_, i) => (
+              <PaginationItem key={i}>
+                <PaginationLink
+                  isActive={i === table.getState().pagination.pageIndex}
+                  onClick={(e) => { e.preventDefault(); table.setPageIndex(i); }}
+                >
+                  {i + 1}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={(e) => { e.preventDefault(); table.nextPage(); }}
+                aria-disabled={!table.getCanNextPage()}
+                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       </div>
     </div>
     </DataTableMoveContext.Provider>

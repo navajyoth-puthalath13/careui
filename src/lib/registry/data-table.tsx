@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/data-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +46,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 // ─── Patient data ─────────────────────────────────────────────────────────────
 
@@ -1022,16 +1030,44 @@ function PinnableColumnsDemo() {
         </div>
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            {(() => {
+              const { pageIndex, pageSize } = table.getState().pagination;
+              const total = table.getFilteredRowModel
+                ? table.getFilteredRowModel().rows.length
+                : table.getCoreRowModel().rows.length;
+              const start = total === 0 ? 0 : pageIndex * pageSize + 1;
+              const end = Math.min((pageIndex + 1) * pageSize, total);
+              return `${start} - ${end} of ${total}`;
+            })()}
           </p>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-              Next
-            </Button>
-          </div>
+          <Pagination className="w-auto mx-0">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={(e) => { e.preventDefault(); table.previousPage(); }}
+                  aria-disabled={!table.getCanPreviousPage()}
+                  className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+              {Array.from({ length: table.getPageCount() }, (_, i) => (
+                <PaginationItem key={i}>
+                  <PaginationLink
+                    isActive={i === table.getState().pagination.pageIndex}
+                    onClick={(e) => { e.preventDefault(); table.setPageIndex(i); }}
+                  >
+                    {i + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={(e) => { e.preventDefault(); table.nextPage(); }}
+                  aria-disabled={!table.getCanNextPage()}
+                  className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </div>
     </DataTablePinContext.Provider>
@@ -1777,6 +1813,338 @@ function RowPinningDemo() {
                   "No results."
                 )
               )
+        )
+      )
+    )
+  );
+}
+
+// ─── Light table demo ───────────────────────────────────────────────────────────
+
+interface LightTableRow {
+  id: string;
+  name: string;
+  availability: "online" | "away" | "busy" | "offline";
+  avatar: string;
+  status: "active" | "inactive";
+  flag: string;
+  email: string;
+  location: string;
+}
+
+const lightTableData: LightTableRow[] = [
+  { id: "1", name: "Alex Johnson", availability: "online", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "active", flag: "us", email: "alex@apple.com", location: "United States" },
+  { id: "2", name: "Sarah Chen", availability: "away", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "gb", email: "sarah@openai.com", location: "United Kingdom" },
+  { id: "3", name: "Michael Rodriguez", availability: "busy", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", status: "active", flag: "ca", email: "michael@meta.com", location: "Canada" },
+  { id: "4", name: "Emma Wilson", availability: "offline", avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "au", email: "emma@tesla.com", location: "Australia" },
+  { id: "5", name: "David Kim", availability: "online", avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", status: "active", flag: "de", email: "david@sap.com", location: "Germany" },
+  { id: "6", name: "Aron Thompson", availability: "away", avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", status: "active", flag: "my", email: "aron@keenthemes.com", location: "Malaysia" },
+  { id: "7", name: "James Brown", availability: "busy", avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "es", email: "james@bbva.es", location: "Spain" },
+  { id: "8", name: "Maria Garcia", availability: "offline", avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", status: "active", flag: "jp", email: "maria@sony.jp", location: "Japan" },
+  { id: "9", name: "Nick Johnson", availability: "online", avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", status: "active", flag: "fr", email: "nick@lvmh.fr", location: "France" },
+  { id: "10", name: "Liam Thompson", availability: "away", avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "it", email: "liam@eni.it", location: "Italy" },
+  { id: "11", name: "Alex Johnson", availability: "busy", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "active", flag: "br", email: "alex@vale.br", location: "Brazil" },
+  { id: "12", name: "Sarah Chen", availability: "offline", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "active", flag: "in", email: "sarah@tata.in", location: "India" },
+];
+
+const availabilityColors: Record<string, string> = {
+  online: "bg-green-500",
+  away: "bg-yellow-500",
+  busy: "bg-orange-500",
+  offline: "bg-gray-400",
+};
+
+const lightTableColumns: ColumnDef<LightTableRow>[] = [
+  {
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-3" },
+        React.createElement(Avatar, { className: "size-8" },
+          React.createElement(AvatarImage, { src: row.original.avatar, alt: row.original.name }),
+          React.createElement(AvatarFallback, null, row.original.name.split(" ").map((n: string) => n[0]).join("")),
+          React.createElement(AvatarBadge, { className: `size-1.5! p-0 ${availabilityColors[row.original.availability] || "bg-gray-400"}` })
+        ),
+        React.createElement("div", { className: "space-y-px" },
+          React.createElement("div", { className: "text-foreground font-medium" }, row.original.name),
+          React.createElement("div", { className: "text-muted-foreground text-xs" }, row.original.email)
+        )
+      ),
+    size: 225,
+  },
+  {
+    accessorKey: "location",
+    header: "Location",
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-1.5" },
+        React.createElement("img", {
+          src: "https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg",
+          alt: row.original.flag,
+          className: "size-4 rounded-full object-cover",
+        }),
+        React.createElement("span", { className: "text-foreground font-medium" }, row.original.location)
+      ),
+    size: 160,
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) =>
+      row.original.status === "active"
+        ? React.createElement(Badge, { variant: "success" }, "Active")
+        : React.createElement(Badge, { variant: "warning" }, "Pending"),
+    size: 100,
+  },
+];
+
+function LightTableDemo() {
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  });
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "name", desc: true },
+  ]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    columns: lightTableColumns,
+    data: lightTableData,
+    state: { pagination, sorting },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const total = table.getFilteredRowModel().rows.length;
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total);
+
+  return React.createElement("div", { className: "w-full space-y-2.5" },
+    React.createElement("div", { className: "rounded-md border" },
+      React.createElement(Table, null,
+        React.createElement(TableHeader, null,
+          table.getHeaderGroups().map((hg) =>
+            React.createElement(TableRow, { key: hg.id, className: "border-none hover:bg-transparent" },
+              hg.headers.map((h) =>
+                React.createElement(TableHead, { key: h.id },
+                  h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())
+                )
+              )
+            )
+          )
+        ),
+        React.createElement(TableBody, null,
+          table.getRowModel().rows.map((row) =>
+            React.createElement(TableRow, { key: row.id, className: "border-none" },
+              row.getVisibleCells().map((cell) =>
+                React.createElement(TableCell, { key: cell.id },
+                  flexRender(cell.column.columnDef.cell, cell.getContext())
+                )
+              )
+            )
+          )
+        )
+      )
+    ),
+    React.createElement("div", { className: "flex items-center justify-between" },
+      React.createElement("p", { className: "text-sm text-muted-foreground" },
+        `${start} - ${end} of ${total}`
+      ),
+      React.createElement(Pagination, { className: "w-auto mx-0" },
+        React.createElement(PaginationContent, null,
+          React.createElement(PaginationItem, null,
+            React.createElement(PaginationPrevious, {
+              onClick: (e: React.MouseEvent) => { e.preventDefault(); table.previousPage(); },
+              "aria-disabled": !table.getCanPreviousPage(),
+              className: !table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined,
+            })
+          ),
+          Array.from({ length: table.getPageCount() }, (_, i) =>
+            React.createElement(PaginationItem, { key: i },
+              React.createElement(PaginationLink, {
+                isActive: i === table.getState().pagination.pageIndex,
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.setPageIndex(i); },
+              }, i + 1)
+            )
+          ),
+          React.createElement(PaginationItem, null,
+            React.createElement(PaginationNext, {
+              onClick: (e: React.MouseEvent) => { e.preventDefault(); table.nextPage(); },
+              "aria-disabled": !table.getCanNextPage(),
+              className: !table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined,
+            })
+          )
+        )
+      )
+    )
+  );
+}
+
+// ─── Striped table demo ─────────────────────────────────────────────────────────
+
+interface StripedTableRow {
+  id: string;
+  name: string;
+  avatar: string;
+  flag: string;
+  email: string;
+  location: string;
+  balance: number;
+}
+
+const stripedTableData: StripedTableRow[] = [
+  { id: "1", name: "Alex Johnson", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "us", email: "alex@apple.com", location: "United States", balance: 5143.03 },
+  { id: "2", name: "Sarah Chen", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "gb", email: "sarah@openai.com", location: "United Kingdom", balance: 4321.87 },
+  { id: "3", name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", flag: "ca", email: "michael@meta.com", location: "Canada", balance: 7654.98 },
+  { id: "4", name: "Emma Wilson", avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", flag: "au", email: "emma@tesla.com", location: "Australia", balance: 3456.45 },
+  { id: "5", name: "David Kim", avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", flag: "de", email: "david@sap.com", location: "Germany", balance: 9876.54 },
+  { id: "6", name: "Aron Thompson", avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", flag: "my", email: "aron@keenthemes.com", location: "Malaysia", balance: 6214.22 },
+  { id: "7", name: "James Brown", avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", flag: "es", email: "james@bbva.es", location: "Spain", balance: 5321.77 },
+  { id: "8", name: "Maria Garcia", avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", flag: "jp", email: "maria@sony.jp", location: "Japan", balance: 8452.39 },
+  { id: "9", name: "Nick Johnson", avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", flag: "fr", email: "nick@lvmh.fr", location: "France", balance: 7345.10 },
+  { id: "10", name: "Liam Thompson", avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", flag: "it", email: "liam@eni.it", location: "Italy", balance: 5214.88 },
+  { id: "11", name: "Alex Johnson", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "br", email: "alex@vale.br", location: "Brazil", balance: 9421.50 },
+  { id: "12", name: "Sarah Chen", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "in", email: "sarah@tata.in", location: "India", balance: 4521.67 },
+];
+
+const stripedTableColumns: ColumnDef<StripedTableRow>[] = [
+  {
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-2" },
+        React.createElement(Avatar, { className: "size-6" },
+          React.createElement(AvatarImage, { src: row.original.avatar, alt: row.original.name }),
+          React.createElement(AvatarFallback, null, row.original.name.split(" ").map((n: string) => n[0]).join(""))
+        ),
+        React.createElement("span", { className: "text-foreground font-medium" }, row.original.name)
+      ),
+    size: 175,
+  },
+  {
+    accessorKey: "email",
+    header: "Email",
+    cell: ({ row }) =>
+      React.createElement("a", {
+        href: "mailto:" + row.original.email,
+        className: "hover:text-primary hover:underline",
+      }, row.original.email),
+    size: 180,
+  },
+  {
+    accessorKey: "location",
+    header: "Location",
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-1.5" },
+        React.createElement("img", {
+          src: "https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg",
+          alt: row.original.flag,
+          className: "size-4 rounded-full object-cover",
+        }),
+        React.createElement("span", { className: "text-foreground font-medium" }, row.original.location)
+      ),
+    size: 170,
+  },
+  {
+    accessorKey: "balance",
+    header: () => React.createElement("div", { className: "text-right" }, "Balance ($)"),
+    cell: ({ row }) =>
+      React.createElement("span", { className: "font-semibold" },
+        "$" + (row.original.balance).toFixed(2)
+      ),
+    meta: { className: "text-right" },
+    size: 120,
+  },
+];
+
+function StripedTableDemo() {
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  });
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "name", desc: true },
+  ]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    columns: stripedTableColumns,
+    data: stripedTableData,
+    state: { pagination, sorting },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const total = table.getFilteredRowModel().rows.length;
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total);
+
+  return React.createElement("div", { className: "w-full space-y-2.5" },
+    React.createElement("div", { className: "rounded-md border" },
+      React.createElement(Table, null,
+        React.createElement(TableHeader, null,
+          table.getHeaderGroups().map((hg) =>
+            React.createElement(TableRow, { key: hg.id },
+              hg.headers.map((h) =>
+                React.createElement(TableHead, { key: h.id, className: h.column.columnDef.meta?.className },
+                  h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())
+                )
+              )
+            )
+          )
+        ),
+        React.createElement(TableBody, null,
+          table.getRowModel().rows.map((row) =>
+            React.createElement(TableRow, {
+              key: row.id,
+              className: "even:bg-muted/50",
+            },
+              row.getVisibleCells().map((cell) =>
+                React.createElement(TableCell, { key: cell.id, className: cell.column.columnDef.meta?.className },
+                  flexRender(cell.column.columnDef.cell, cell.getContext())
+                )
+              )
+            )
+          )
+        )
+      )
+    ),
+    React.createElement("div", { className: "flex items-center justify-between" },
+      React.createElement("p", { className: "text-sm text-muted-foreground" },
+        `${start} - ${end} of ${total}`
+      ),
+      React.createElement(Pagination, { className: "w-auto mx-0" },
+        React.createElement(PaginationContent, null,
+          React.createElement(PaginationItem, null,
+            React.createElement(PaginationPrevious, {
+              onClick: (e: React.MouseEvent) => { e.preventDefault(); table.previousPage(); },
+              "aria-disabled": !table.getCanPreviousPage(),
+              className: !table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined,
+            })
+          ),
+          Array.from({ length: table.getPageCount() }, (_, i) =>
+            React.createElement(PaginationItem, { key: i },
+              React.createElement(PaginationLink, {
+                isActive: i === table.getState().pagination.pageIndex,
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.setPageIndex(i); },
+              }, i + 1)
+            )
+          ),
+          React.createElement(PaginationItem, null,
+            React.createElement(PaginationNext, {
+              onClick: (e: React.MouseEvent) => { e.preventDefault(); table.nextPage(); },
+              "aria-disabled": !table.getCanNextPage(),
+              className: !table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined,
+            })
+          )
         )
       )
     )
@@ -3042,16 +3410,44 @@ export function PinnableColumnsTable() {
         </div>
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            {(() => {
+              const { pageIndex, pageSize } = table.getState().pagination;
+              const total = table.getFilteredRowModel
+                ? table.getFilteredRowModel().rows.length
+                : table.getCoreRowModel().rows.length;
+              const start = total === 0 ? 0 : pageIndex * pageSize + 1;
+              const end = Math.min((pageIndex + 1) * pageSize, total);
+              return start + " - " + end + " of " + total;
+            })()}
           </p>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-              Next
-            </Button>
-          </div>
+          <Pagination className="w-auto mx-0">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={(e) => { e.preventDefault(); table.previousPage(); }}
+                  aria-disabled={!table.getCanPreviousPage()}
+                  className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+              {Array.from({ length: table.getPageCount() }, (_, i) => (
+                <PaginationItem key={i}>
+                  <PaginationLink
+                    isActive={i === table.getState().pagination.pageIndex}
+                    onClick={(e) => { e.preventDefault(); table.setPageIndex(i); }}
+                  >
+                    {i + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={(e) => { e.preventDefault(); table.nextPage(); }}
+                  aria-disabled={!table.getCanNextPage()}
+                  className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </div>
     </DataTablePinContext.Provider>
@@ -4091,6 +4487,385 @@ export function StickyHeaderTable() {
   )
 }`,
       preview: React.createElement(StickyHeaderDemo),
+    },
+    {
+      name: "Light Table",
+      description:
+        "A minimal, borderless-row table with avatar + status badges, rounded hover rows, and CareUI Pagination. The entire table sits inside a bordered container for a clean card look.",
+      code: `"use client"
+
+import { useState, useMemo } from "react"
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  type ColumnDef,
+  type PaginationState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import { cn } from "@/lib/utils"
+
+interface IData {
+  id: string
+  name: string
+  availability: "online" | "away" | "busy" | "offline"
+  avatar: string
+  status: "active" | "inactive"
+  flag: string
+  email: string
+  location: string
+}
+
+const data: IData[] = [
+  { id: "1", name: "Alex Johnson", availability: "online", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "active", flag: "us", email: "alex@apple.com", location: "United States" },
+  { id: "2", name: "Sarah Chen", availability: "away", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "gb", email: "sarah@openai.com", location: "United Kingdom" },
+  { id: "3", name: "Michael Rodriguez", availability: "busy", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", status: "active", flag: "ca", email: "michael@meta.com", location: "Canada" },
+  { id: "4", name: "Emma Wilson", availability: "offline", avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "au", email: "emma@tesla.com", location: "Australia" },
+  { id: "5", name: "David Kim", availability: "online", avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", status: "active", flag: "de", email: "david@sap.com", location: "Germany" },
+  { id: "6", name: "Aron Thompson", availability: "away", avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", status: "active", flag: "my", email: "aron@keenthemes.com", location: "Malaysia" },
+  { id: "7", name: "James Brown", availability: "busy", avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "es", email: "james@bbva.es", location: "Spain" },
+  { id: "8", name: "Maria Garcia", availability: "offline", avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", status: "active", flag: "jp", email: "maria@sony.jp", location: "Japan" },
+  { id: "9", name: "Nick Johnson", availability: "online", avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", status: "active", flag: "fr", email: "nick@lvmh.fr", location: "France" },
+  { id: "10", name: "Liam Thompson", availability: "away", avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "it", email: "liam@eni.it", location: "Italy" },
+  { id: "11", name: "Alex Johnson", availability: "busy", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "active", flag: "br", email: "alex@vale.br", location: "Brazil" },
+  { id: "12", name: "Sarah Chen", availability: "offline", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "active", flag: "in", email: "sarah@tata.in", location: "India" },
+]
+
+const statusColors = { online: "bg-green-500", away: "bg-yellow-500", busy: "bg-orange-500", offline: "bg-gray-400" }
+
+export function LightTableDemo() {
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 5 })
+  const [sorting, setSorting] = useState<SortingState>([{ id: "name", desc: true }])
+
+  const columns = useMemo<ColumnDef<IData>[]>(() => [
+    {
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <Avatar className="size-8">
+            <AvatarImage src={row.original.avatar} alt={row.original.name} />
+            <AvatarFallback>{row.original.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+            <AvatarBadge className={cn("size-1.5! p-0", statusColors[row.original.availability])} />
+          </Avatar>
+          <div className="space-y-px">
+            <div className="text-foreground font-medium">{row.original.name}</div>
+            <div className="text-muted-foreground text-xs">{row.original.email}</div>
+          </div>
+        </div>
+      ),
+      size: 225,
+    },
+    {
+      accessorKey: "location",
+      header: "Location",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5">
+          <img src={"https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg"} alt={row.original.flag} className="size-4 rounded-full object-cover" />
+          <span className="text-foreground font-medium">{row.original.location}</span>
+        </div>
+      ),
+      size: 160,
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) =>
+        row.original.status === "active"
+          ? <Badge variant="success">Active</Badge>
+          : <Badge variant="warning">Pending</Badge>,
+      size: 100,
+    },
+  ], [])
+
+  const table = useReactTable({
+    columns,
+    data,
+    state: { pagination, sorting },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const total = table.getFilteredRowModel().rows.length
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total)
+
+  return (
+    <div className="w-full space-y-2.5">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id} className="border-none hover:bg-transparent">
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id}>{h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}</TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id} className="border-none">
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">{start} - {end} of {total}</p>
+        <Pagination className="w-auto mx-0">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={(e) => { e.preventDefault(); table.previousPage(); }}
+                aria-disabled={!table.getCanPreviousPage()}
+                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+            {Array.from({ length: table.getPageCount() }, (_, i) => (
+              <PaginationItem key={i}>
+                <PaginationLink
+                  isActive={i === table.getState().pagination.pageIndex}
+                  onClick={(e) => { e.preventDefault(); table.setPageIndex(i); }}
+                >
+                  {i + 1}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={(e) => { e.preventDefault(); table.nextPage(); }}
+                aria-disabled={!table.getCanNextPage()}
+                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    </div>
+  )
+}`,
+      preview: React.createElement(LightTableDemo),
+    },
+    {
+      name: "Striped Table",
+      description:
+        "Alternating row backgrounds (`even:bg-muted/50`) for easier scanning of dense data. Includes avatar, email link, country flag, and right-aligned balance column with CareUI Pagination.",
+      code: `"use client"
+
+import { useState, useMemo } from "react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  type ColumnDef,
+  type PaginationState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+interface IData {
+  id: string
+  name: string
+  avatar: string
+  flag: string
+  email: string
+  location: string
+  balance: number
+}
+
+const data: IData[] = [
+  { id: "1", name: "Alex Johnson", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "us", email: "alex@apple.com", location: "United States", balance: 5143.03 },
+  { id: "2", name: "Sarah Chen", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "gb", email: "sarah@openai.com", location: "United Kingdom", balance: 4321.87 },
+  { id: "3", name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", flag: "ca", email: "michael@meta.com", location: "Canada", balance: 7654.98 },
+  { id: "4", name: "Emma Wilson", avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", flag: "au", email: "emma@tesla.com", location: "Australia", balance: 3456.45 },
+  { id: "5", name: "David Kim", avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", flag: "de", email: "david@sap.com", location: "Germany", balance: 9876.54 },
+  { id: "6", name: "Aron Thompson", avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", flag: "my", email: "aron@keenthemes.com", location: "Malaysia", balance: 6214.22 },
+  { id: "7", name: "James Brown", avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", flag: "es", email: "james@bbva.es", location: "Spain", balance: 5321.77 },
+  { id: "8", name: "Maria Garcia", avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", flag: "jp", email: "maria@sony.jp", location: "Japan", balance: 8452.39 },
+  { id: "9", name: "Nick Johnson", avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", flag: "fr", email: "nick@lvmh.fr", location: "France", balance: 7345.10 },
+  { id: "10", name: "Liam Thompson", avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", flag: "it", email: "liam@eni.it", location: "Italy", balance: 5214.88 },
+  { id: "11", name: "Alex Johnson", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "br", email: "alex@vale.br", location: "Brazil", balance: 9421.50 },
+  { id: "12", name: "Sarah Chen", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "in", email: "sarah@tata.in", location: "India", balance: 4521.67 },
+]
+
+export function StripedTableDemo() {
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 5 })
+  const [sorting, setSorting] = useState<SortingState>([{ id: "name", desc: true }])
+
+  const columns = useMemo<ColumnDef<IData>[]>(() => [
+    {
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Avatar className="size-6">
+            <AvatarImage src={row.original.avatar} alt={row.original.name} />
+            <AvatarFallback>{row.original.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+          </Avatar>
+          <span className="text-foreground font-medium">{row.original.name}</span>
+        </div>
+      ),
+      size: 175,
+    },
+    {
+      accessorKey: "email",
+      header: "Email",
+      cell: ({ row }) => (
+        <a href={"mailto:" + row.original.email} className="hover:text-primary hover:underline">
+          {row.original.email}
+        </a>
+      ),
+      size: 180,
+    },
+    {
+      accessorKey: "location",
+      header: "Location",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5">
+          <img
+            src={"https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg"}
+            alt={row.original.flag}
+            className="size-4 rounded-full object-cover"
+          />
+          <span className="text-foreground font-medium">{row.original.location}</span>
+        </div>
+      ),
+      size: 170,
+    },
+    {
+      accessorKey: "balance",
+      header: () => <div className="text-right">Balance ($)</div>,
+      cell: ({ row }) => (
+        <span className="font-semibold">{"$"}{(row.original.balance).toFixed(2)}</span>
+      ),
+      size: 120,
+      meta: { className: "text-right" },
+    },
+  ], [])
+
+  const table = useReactTable({
+    columns,
+    data,
+    state: { pagination, sorting },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const total = table.getFilteredRowModel().rows.length
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total)
+
+  return (
+    <div className="w-full space-y-2.5">
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id}>{h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}</TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id} className="even:bg-muted/50">
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">{start} - {end} of {total}</p>
+        <Pagination className="w-auto mx-0">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={(e) => { e.preventDefault(); table.previousPage(); }}
+                aria-disabled={!table.getCanPreviousPage()}
+                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+            {Array.from({ length: table.getPageCount() }, (_, i) => (
+              <PaginationItem key={i}>
+                <PaginationLink
+                  isActive={i === table.getState().pagination.pageIndex}
+                  onClick={(e) => { e.preventDefault(); table.setPageIndex(i); }}
+                >
+                  {i + 1}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={(e) => { e.preventDefault(); table.nextPage(); }}
+                aria-disabled={!table.getCanNextPage()}
+                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    </div>
+  )
+}`,
+      preview: React.createElement(StripedTableDemo),
     },
   ],
   props: [
