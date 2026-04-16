@@ -3,7 +3,6 @@ import { type ComponentDoc } from "@/lib/types";
 import {
   DataTable,
   DataTableColumnHeader,
-  DataTablePinContext,
   DataTableRowActions,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -12,13 +11,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   type ColumnDef,
   type Header,
   type PaginationState,
   type Row,
   type RowPinningState,
+  type RowSelectionState,
   type SortingState,
+  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -26,7 +28,27 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, ChevronUp, GripVertical, HeartPulse, MapPin, Pin, PinOff, Stethoscope, User } from "lucide-react";
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChevronDown, ChevronUp, Filter, GripVertical, HeartPulse, MapPin, MoreHorizontal, Pin, PinOff, Search, Settings2, Stethoscope, User, UserPlus, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import {
   DndContext,
   type DragEndEvent,
@@ -207,96 +229,6 @@ const patientCell = (name: string, id: string) =>
       React.createElement("span", { className: "text-muted-foreground text-xs" }, id)
     )
   );
-
-// ─── Patient columns (full — main preview) ────────────────────────────────────
-
-const patientColumns: ColumnDef<Patient>[] = [
-  {
-    id: "select",
-    header: ({ table }) =>
-      React.createElement(Checkbox, {
-        checked:
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() ? "indeterminate" : false),
-        onCheckedChange: (value) => table.toggleAllPageRowsSelected(!!value),
-        "aria-label": "Select all",
-      }),
-    cell: ({ row }) =>
-      React.createElement(Checkbox, {
-        checked: row.getIsSelected(),
-        onCheckedChange: (value) => row.toggleSelected(!!value),
-        "aria-label": "Select row",
-      }),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    id: "patient",
-    accessorKey: "name",
-    header: ({ column }) =>
-      React.createElement(DataTableColumnHeader, {
-        column: column as any,
-        title: "Patient",
-      }),
-    cell: ({ row }) => patientCell(row.original.name, row.original.id),
-  },
-  {
-    id: "demographics",
-    header: "Age / Gender",
-    cell: ({ row }) =>
-      React.createElement(
-        "span",
-        { className: "text-sm tabular-nums" },
-        `${row.original.age}y ${row.original.gender}`
-      ),
-  },
-  {
-    id: "location",
-    header: "Ward / Bed",
-    cell: ({ row }) =>
-      React.createElement(
-        "div",
-        { className: "flex flex-col" },
-        React.createElement("span", { className: "font-medium text-sm" }, row.original.ward),
-        React.createElement("span", { className: "text-muted-foreground text-xs" }, row.original.bed)
-      ),
-  },
-  {
-    accessorKey: "diagnosis",
-    header: "Diagnosis",
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) =>
-      React.createElement(
-        Badge,
-        { variant: patientStatusVariant[row.getValue("status") as Patient["status"]] },
-        row.getValue("status")
-      ),
-  },
-  {
-    id: "actions",
-    enableHiding: false,
-    meta: { className: "w-0" },
-    cell: ({ row }) =>
-      React.createElement(
-        DataTableRowActions,
-        {},
-        React.createElement(DropdownMenuItem, {}, "View record"),
-        React.createElement(DropdownMenuItem, {}, "Edit details"),
-        React.createElement(DropdownMenuSeparator, {}),
-        React.createElement(DropdownMenuItem, {}, "Add note"),
-        React.createElement(DropdownMenuItem, {}, "Prescribe medication"),
-        React.createElement(DropdownMenuSeparator, {}),
-        React.createElement(
-          DropdownMenuItem,
-          { className: row.original.status === "discharged" ? "text-muted-foreground" : "" },
-          "Discharge patient"
-        )
-      ),
-  },
-];
 
 // ─── Medication log columns ───────────────────────────────────────────────────
 
@@ -508,14 +440,115 @@ const sortableStaffColumns: ColumnDef<StaffMember>[] = [
   },
 ];
 
+// ─── Selection members data ──────────────────────────────────────────────────
+
+type SelectionMember = {
+  id: string;
+  name: string;
+  availability: "online" | "away" | "busy" | "offline";
+  avatar: string;
+  flag: string;
+  email: string;
+  location: string;
+  joined: string;
+};
+
+const selectionMembers: SelectionMember[] = [
+  { id: "1",  name: "Alex Johnson",      availability: "online",  avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "us", email: "alex@apple.com",      location: "United States",  joined: "Apr, 2021" },
+  { id: "2",  name: "Sarah Chen",        availability: "away",    avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "gb", email: "sarah@openai.com",    location: "United Kingdom", joined: "Jul, 2020" },
+  { id: "3",  name: "Michael Rodriguez", availability: "busy",    avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", flag: "ca", email: "michael@meta.com",    location: "Canada",         joined: "Mar, 2019" },
+  { id: "4",  name: "Emma Wilson",       availability: "offline", avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", flag: "au", email: "emma@tesla.com",      location: "Australia",      joined: "Jan, 2022" },
+  { id: "5",  name: "David Kim",         availability: "online",  avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", flag: "de", email: "david@sap.com",       location: "Germany",        joined: "May, 2023" },
+  { id: "6",  name: "Aron Thompson",     availability: "away",    avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", flag: "my", email: "aron@keenthemes.com", location: "Malaysia",       joined: "Nov, 2018" },
+  { id: "7",  name: "James Brown",       availability: "busy",    avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", flag: "es", email: "james@bbva.es",       location: "Spain",          joined: "Jun, 2021" },
+  { id: "8",  name: "Maria Garcia",      availability: "offline", avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", flag: "jp", email: "maria@sony.jp",       location: "Japan",          joined: "Oct, 2020" },
+  { id: "9",  name: "Nick Johnson",      availability: "online",  avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", flag: "fr", email: "nick@lvmh.fr",        location: "France",         joined: "Sep, 2019" },
+  { id: "10", name: "Liam Thompson",     availability: "away",    avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", flag: "it", email: "liam@eni.it",         location: "Italy",          joined: "Feb, 2023" },
+  { id: "11", name: "Alex Johnson",      availability: "busy",    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "br", email: "alex@vale.br",        location: "Brazil",         joined: "Dec, 2022" },
+  { id: "12", name: "Sarah Chen",        availability: "offline", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "in", email: "sarah@tata.in",       location: "India",          joined: "Mar, 2020" },
+];
+
+const availabilityColor: Record<SelectionMember["availability"], string> = {
+  online: "bg-green-500",
+  away: "bg-yellow-500",
+  busy: "bg-orange-500",
+  offline: "bg-gray-400",
+};
+
+const selectionColumns: ColumnDef<SelectionMember>[] = [
+  {
+    id: "select",
+    header: ({ table }) =>
+      React.createElement(Checkbox, {
+        checked:
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() ? "indeterminate" : false),
+        onCheckedChange: (value: boolean) => table.toggleAllPageRowsSelected(!!value),
+        "aria-label": "Select all",
+      }),
+    cell: ({ row }) =>
+      React.createElement(Checkbox, {
+        checked: row.getIsSelected(),
+        onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
+        "aria-label": "Select row",
+      }),
+    enableSorting: false,
+    enableHiding: false,
+    size: 20,
+  },
+  {
+    accessorKey: "name",
+    id: "name",
+    header: "Name",
+    size: 200,
+    enableSorting: true,
+    enableHiding: false,
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-3" },
+        React.createElement(Avatar, { className: "size-8" },
+          React.createElement(AvatarImage, { src: row.original.avatar, alt: row.original.name }),
+          React.createElement(AvatarFallback, null, row.original.name.split(" ").map((n: string) => n[0]).join("")),
+          React.createElement(AvatarBadge, {
+            className: "size-1.5! p-0 " + (availabilityColor[row.original.availability] || availabilityColor.offline),
+          })
+        ),
+        React.createElement("div", { className: "space-y-px" },
+          React.createElement("div", { className: "text-foreground font-medium" }, row.original.name),
+          React.createElement("div", { className: "text-muted-foreground" }, row.original.email)
+        )
+      ),
+  },
+  {
+    accessorKey: "location",
+    header: "Location",
+    size: 180,
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-1.5" },
+        React.createElement("img", {
+          src: "https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg",
+          alt: row.original.flag,
+          className: "size-4 rounded-full object-cover",
+        }),
+        React.createElement("div", { className: "text-foreground font-medium" }, row.original.location)
+      ),
+  },
+  {
+    accessorKey: "joined",
+    header: "Joined",
+    size: 120,
+    cell: ({ row }) =>
+      React.createElement("span", { className: "font-medium" }, row.original.joined),
+  },
+];
+
 // ─── Preview components ───────────────────────────────────────────────────────
 
 const PatientTableDemo = () =>
   React.createElement(DataTable as any, {
-    columns: patientColumns,
-    data: patients,
+    columns: selectionColumns,
+    data: selectionMembers,
     filterColumn: "name",
-    filterPlaceholder: "Search patients...",
+    filterPlaceholder: "Search members...",
   });
 
 const MedLogDemo = () =>
@@ -895,33 +928,82 @@ function ResizableColumnsDemo() {
 
 // ─── Pinnable columns demo ───────────────────────────────────────────────────
 
-const pinnableColumns: ColumnDef<DndMember>[] = [
+type PinnableMember = {
+  id: string;
+  name: string;
+  availability: "online" | "away" | "busy" | "offline";
+  avatar: string;
+  status: "active" | "inactive";
+  flag: string;
+  email: string;
+  company: string;
+  role: string;
+  joined: string;
+  location: string;
+};
+
+const pinnableMembers: PinnableMember[] = [
+  { id: "1",  name: "Alex Johnson",      availability: "online",  avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "active",   flag: "us", email: "alex@apple.com",       company: "Apple",      role: "CEO",              joined: "Jan, 2024", location: "United States"  },
+  { id: "2",  name: "Sarah Chen",        availability: "away",    avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "gb", email: "sarah@openai.com",     company: "OpenAI",     role: "CTO",              joined: "Mar, 2023", location: "United Kingdom" },
+  { id: "3",  name: "Michael Rodriguez", availability: "busy",    avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", status: "active",   flag: "ca", email: "michael@meta.com",     company: "Meta",       role: "Designer",         joined: "Jun, 2022", location: "Canada"         },
+  { id: "4",  name: "Emma Wilson",       availability: "offline", avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "au", email: "emma@tesla.com",       company: "Tesla",      role: "Developer",        joined: "Sep, 2024", location: "Australia"      },
+  { id: "5",  name: "David Kim",         availability: "online",  avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", status: "active",   flag: "de", email: "david@sap.com",        company: "SAP",        role: "Lawyer",           joined: "Nov, 2023", location: "Germany"        },
+  { id: "6",  name: "Aron Thompson",     availability: "away",    avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", status: "active",   flag: "my", email: "aron@keenthemes.com",  company: "Keenthemes", role: "Director",         joined: "Feb, 2022", location: "Malaysia"       },
+  { id: "7",  name: "James Brown",       availability: "busy",    avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "es", email: "james@bbva.es",        company: "BBVA",       role: "Product Manager",  joined: "Aug, 2024", location: "Spain"          },
+  { id: "8",  name: "Maria Garcia",      availability: "offline", avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", status: "active",   flag: "jp", email: "maria@sony.jp",        company: "Sony",       role: "Marketing Lead",   joined: "Dec, 2023", location: "Japan"          },
+  { id: "9",  name: "Nick Johnson",      availability: "online",  avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "fr", email: "nick@lvmh.fr",         company: "LVMH",       role: "Data Scientist",   joined: "Apr, 2022", location: "France"         },
+  { id: "10", name: "Liam Thompson",     availability: "away",    avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "it", email: "liam@eni.it",          company: "ENI",        role: "Engineer",         joined: "Jul, 2024", location: "Italy"          },
+  { id: "11", name: "Alex Johnson",      availability: "busy",    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "active",   flag: "br", email: "alex@vale.br",         company: "Vale",       role: "Software Engineer", joined: "May, 2023", location: "Brazil"        },
+  { id: "12", name: "Sarah Chen",        availability: "offline", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "active",   flag: "in", email: "sarah@tata.in",        company: "Tata",       role: "Sales Manager",    joined: "Oct, 2024", location: "India"          },
+];
+
+const pinnableColumns: ColumnDef<PinnableMember>[] = [
   {
     id: "name",
     accessorKey: "name",
+    size: 220,
     enableSorting: true,
     enableHiding: false,
     header: ({ column }) => <DataTableColumnHeader column={column as any} title="Name" />,
     cell: ({ row }) => (
-      <div className="flex items-center gap-3">
-        <Avatar shape="circle">
+      <div className="flex items-center gap-2">
+        <Avatar className="size-6" shape="circle">
           <AvatarImage src={row.original.avatar} alt={row.original.name} />
           <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
         </Avatar>
-        <span className="font-medium text-sm whitespace-nowrap">{row.original.name}</span>
+        <span className="text-foreground font-medium whitespace-nowrap">{row.original.name}</span>
       </div>
     ),
   },
   {
     id: "email",
     accessorKey: "email",
+    size: 220,
     enableSorting: true,
     header: ({ column }) => <DataTableColumnHeader column={column as any} title="Email" />,
     cell: ({ row }) => <span className="text-muted-foreground text-sm whitespace-nowrap">{row.original.email}</span>,
   },
   {
+    id: "location",
+    accessorKey: "location",
+    size: 180,
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Location" />,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-1.5">
+        <img
+          src={`https://flagcdn.com/${row.original.flag.toLowerCase()}.svg`}
+          alt={row.original.flag}
+          className="size-4 rounded-full object-cover"
+        />
+        <span className="text-foreground font-medium whitespace-nowrap">{row.original.location}</span>
+      </div>
+    ),
+  },
+  {
     id: "company",
     accessorKey: "company",
+    size: 160,
     enableSorting: true,
     header: ({ column }) => <DataTableColumnHeader column={column as any} title="Company" />,
     cell: ({ row }) => <span className="font-medium text-sm whitespace-nowrap">{row.original.company}</span>,
@@ -929,22 +1011,25 @@ const pinnableColumns: ColumnDef<DndMember>[] = [
   {
     id: "role",
     accessorKey: "role",
+    size: 180,
     enableSorting: true,
-    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Occupation" />,
+    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Role" />,
     cell: ({ row }) => <span className="text-sm whitespace-nowrap">{row.original.role}</span>,
   },
   {
-    id: "location",
-    accessorKey: "location",
+    id: "joined",
+    accessorKey: "joined",
+    size: 120,
     enableSorting: true,
-    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Location" />,
-    cell: ({ row }) => <span className="text-sm whitespace-nowrap">{row.original.location}</span>,
+    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Joined" />,
+    cell: ({ row }) => <span className="font-medium text-sm whitespace-nowrap">{row.original.joined}</span>,
   },
   {
     id: "status",
     accessorKey: "status",
+    size: 140,
     enableSorting: false,
-    header: "Status",
+    header: ({ column }) => <DataTableColumnHeader column={column as any} title="Status" />,
     cell: ({ row }) =>
       row.original.status === "active"
         ? <Badge variant="success">Approved</Badge>
@@ -952,127 +1037,15 @@ const pinnableColumns: ColumnDef<DndMember>[] = [
   },
 ];
 
-function PinnableColumnsDemo() {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [pagination, setPagination] = React.useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 5,
-  });
-
-  const table = useReactTable({
-    data: dndMembers,
+const PinnableColumnsDemo = () =>
+  React.createElement(DataTable as any, {
     columns: pinnableColumns,
-    state: { sorting, pagination },
-    onSortingChange: setSorting,
-    onPaginationChange: setPagination,
-    initialState: {
-      columnPinning: { left: ["name"] },
-    },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    data: pinnableMembers,
+    filterColumn: "name",
+    filterPlaceholder: "Search members...",
+    pinnable: true,
+    initialPinning: { left: ["name"] },
   });
-
-  return (
-    <DataTablePinContext.Provider value={true}>
-      <div className="flex flex-col gap-4 w-full">
-        <div className="overflow-x-auto rounded-md border [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r">
-          <Table className="w-max">
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    const isPinned = header.column.getIsPinned();
-                    return (
-                      <TableHead
-                        key={header.id}
-                        style={isPinned ? {
-                          position: "sticky",
-                          left: isPinned === "left" ? header.column.getStart("left") : undefined,
-                          right: isPinned === "right" ? header.column.getAfter("right") : undefined,
-                          zIndex: 1,
-                          boxShadow: isPinned === "left" ? "inset -0.5px 0 0 0 var(--border)" : "inset 0.5px 0 0 0 var(--border)",
-                        } : undefined}
-                        className={isPinned ? "bg-background" : ""}
-                      >
-                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                      </TableHead>
-                    );
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => {
-                    const isPinned = cell.column.getIsPinned();
-                    return (
-                      <TableCell
-                        key={cell.id}
-                        style={isPinned ? {
-                          position: "sticky",
-                          left: isPinned === "left" ? cell.column.getStart("left") : undefined,
-                          right: isPinned === "right" ? cell.column.getAfter("right") : undefined,
-                          zIndex: 1,
-                          boxShadow: isPinned === "left" ? "inset -0.5px 0 0 0 var(--border)" : "inset 0.5px 0 0 0 var(--border)",
-                        } : undefined}
-                        className={isPinned ? "bg-background" : ""}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {(() => {
-              const { pageIndex, pageSize } = table.getState().pagination;
-              const total = table.getFilteredRowModel
-                ? table.getFilteredRowModel().rows.length
-                : table.getCoreRowModel().rows.length;
-              const start = total === 0 ? 0 : pageIndex * pageSize + 1;
-              const end = Math.min((pageIndex + 1) * pageSize, total);
-              return `${start} - ${end} of ${total}`;
-            })()}
-          </p>
-          <Pagination className="w-auto mx-0">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={(e) => { e.preventDefault(); table.previousPage(); }}
-                  aria-disabled={!table.getCanPreviousPage()}
-                  className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
-                />
-              </PaginationItem>
-              {Array.from({ length: table.getPageCount() }, (_, i) => (
-                <PaginationItem key={i}>
-                  <PaginationLink
-                    isActive={i === table.getState().pagination.pageIndex}
-                    onClick={(e) => { e.preventDefault(); table.setPageIndex(i); }}
-                  >
-                    {i + 1}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={(e) => { e.preventDefault(); table.nextPage(); }}
-                  aria-disabled={!table.getCanNextPage()}
-                  className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      </div>
-    </DataTablePinContext.Provider>
-  );
-}
 
 // ─── Cell-border columns ──────────────────────────────────────────────────────
 
@@ -1181,71 +1154,322 @@ const DenseDemo = () =>
 
 // ─── Auto-width columns ───────────────────────────────────────────────────────
 
-const autoWidthColumns: ColumnDef<Patient>[] = [
+interface AutoWidthRow {
+  id: string;
+  name: string;
+  avatar: string;
+  flag: string;
+  email: string;
+  location: string;
+  joined: string;
+}
+
+const autoWidthData: AutoWidthRow[] = [
+  { id: "1", name: "Alex Johnson", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "us", email: "alex@apple.com", location: "United States", joined: "Jan, 2026" },
+  { id: "2", name: "Sarah Chen", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "gb", email: "sarah@openai.com", location: "United Kingdom", joined: "Jul, 2025" },
+  { id: "3", name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", flag: "ca", email: "michael@meta.com", location: "Canada", joined: "Mar, 2019" },
+  { id: "4", name: "Emma Wilson", avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", flag: "au", email: "emma@tesla.com", location: "Australia", joined: "Jan, 2024" },
+  { id: "5", name: "David Kim", avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", flag: "de", email: "david@sap.com", location: "Germany", joined: "May, 2023" },
+  { id: "6", name: "Aron Thompson", avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", flag: "my", email: "aron@keenthemes.com", location: "Malaysia", joined: "Nov, 2018" },
+  { id: "7", name: "James Brown", avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", flag: "es", email: "james@bbva.es", location: "Spain", joined: "Jun, 2021" },
+  { id: "8", name: "Maria Garcia", avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", flag: "jp", email: "maria@sony.jp", location: "Japan", joined: "Oct, 2020" },
+  { id: "9", name: "Nick Johnson", avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", flag: "fr", email: "nick@lvmh.fr", location: "France", joined: "Sep, 2019" },
+  { id: "10", name: "Liam Thompson", avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", flag: "it", email: "liam@eni.it", location: "Italy", joined: "Feb, 2023" },
+  { id: "11", name: "Alex Johnson", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "br", email: "alex@vale.br", location: "Brazil", joined: "Dec, 2022" },
+  { id: "12", name: "Sarah Chen", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "in", email: "sarah@tata.in", location: "India", joined: "Mar, 2020" },
+];
+
+const autoWidthColumns: ColumnDef<AutoWidthRow>[] = [
   {
-    id: "patient",
     accessorKey: "name",
     header: "Name",
+    size: 225,
     cell: ({ row }) =>
-      React.createElement(
-        "div",
-        { className: "flex items-center gap-2" },
-        React.createElement(Avatar, { shape: "rounded", size: "sm" },
-          React.createElement(AvatarFallback, { color: "primary" }, getInitials(row.original.name))
+      React.createElement("div", { className: "flex items-center gap-2" },
+        React.createElement(Avatar, { className: "size-6" },
+          React.createElement(AvatarImage, { src: row.original.avatar, alt: row.original.name }),
+          React.createElement(AvatarFallback, null, row.original.name.split(" ").map((n: string) => n[0]).join(""))
         ),
-        React.createElement("span", { className: "font-medium whitespace-nowrap" }, row.original.name)
+        React.createElement("a", { href: "#", className: "text-foreground hover:text-primary font-medium whitespace-nowrap" }, row.original.name)
       ),
   },
   {
-    accessorKey: "ward",
-    header: "Ward / Bed",
+    accessorKey: "email",
+    header: "Email",
+    size: 200,
     cell: ({ row }) =>
-      React.createElement(
-        "span",
-        { className: "whitespace-nowrap text-sm" },
-        `${row.original.ward} · ${row.original.bed}`
+      React.createElement("a", {
+        href: "mailto:" + row.original.email,
+        className: "hover:text-primary hover:underline whitespace-nowrap",
+      }, row.original.email),
+  },
+  {
+    accessorKey: "location",
+    header: "Location",
+    size: 175,
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-1.5" },
+        React.createElement("img", {
+          src: "https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg",
+          alt: row.original.flag,
+          className: "size-4 rounded-full object-cover",
+        }),
+        React.createElement("span", { className: "text-foreground font-medium whitespace-nowrap" }, row.original.location)
       ),
   },
   {
-    accessorKey: "diagnosis",
-    header: "Diagnosis",
+    accessorKey: "joined",
+    header: "Joined",
+    size: 120,
     cell: ({ row }) =>
-      React.createElement(
-        "span",
-        { className: "whitespace-nowrap" },
-        row.original.diagnosis
-      ),
-  },
-  {
-    id: "age",
-    header: "Age",
-    cell: ({ row }) =>
-      React.createElement(
-        "span",
-        { className: "tabular-nums text-sm whitespace-nowrap" },
-        `${row.original.age}y ${row.original.gender}`
-      ),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) =>
-      React.createElement(
-        Badge,
-        { variant: patientStatusVariant[row.getValue("status") as Patient["status"]] },
-        row.getValue("status")
-      ),
+      React.createElement("span", { className: "font-medium whitespace-nowrap" }, row.original.joined),
   },
 ];
 
-const AutoWidthDemo = () =>
-  React.createElement(DataTable as any, {
-    columns: autoWidthColumns,
-    data: patients,
-    filterColumn: "name",
-    filterPlaceholder: "Search patients...",
-    autoWidth: true,
+function AutoWidthDemo() {
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
   });
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "name", desc: true },
+  ]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    columns: autoWidthColumns,
+    data: autoWidthData,
+    state: { pagination, sorting },
+    columnResizeMode: "onChange",
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const total = table.getFilteredRowModel().rows.length;
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total);
+
+  return React.createElement("div", { className: "w-full space-y-2.5" },
+    React.createElement("div", { className: "w-fit overflow-x-auto rounded-md border" },
+      React.createElement(Table, { className: "w-auto" },
+        React.createElement(TableHeader, null,
+          table.getHeaderGroups().map((hg) =>
+            React.createElement(TableRow, { key: hg.id },
+              hg.headers.map((h) =>
+                React.createElement(TableHead, { key: h.id, style: { width: h.getSize() } },
+                  h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())
+                )
+              )
+            )
+          )
+        ),
+        React.createElement(TableBody, null,
+          table.getRowModel().rows.map((row) =>
+            React.createElement(TableRow, { key: row.id },
+              row.getVisibleCells().map((cell) =>
+                React.createElement(TableCell, { key: cell.id, style: { width: cell.column.getSize() } },
+                  flexRender(cell.column.columnDef.cell, cell.getContext())
+                )
+              )
+            )
+          )
+        )
+      )
+    ),
+    React.createElement("div", { className: "flex items-center justify-between" },
+      React.createElement("p", { className: "text-sm text-muted-foreground" },
+        `${start} - ${end} of ${total}`
+      ),
+      React.createElement(Pagination, { className: "w-auto mx-0" },
+        React.createElement(PaginationContent, null,
+          React.createElement(PaginationItem, null,
+            React.createElement(PaginationPrevious, {
+              onClick: (e: React.MouseEvent) => { e.preventDefault(); table.previousPage(); },
+              "aria-disabled": !table.getCanPreviousPage(),
+              className: !table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined,
+            })
+          ),
+          Array.from({ length: table.getPageCount() }, (_, i) =>
+            React.createElement(PaginationItem, { key: i },
+              React.createElement(PaginationLink, {
+                isActive: i === table.getState().pagination.pageIndex,
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.setPageIndex(i); },
+              }, i + 1)
+            )
+          ),
+          React.createElement(PaginationItem, null,
+            React.createElement(PaginationNext, {
+              onClick: (e: React.MouseEvent) => { e.preventDefault(); table.nextPage(); },
+              "aria-disabled": !table.getCanNextPage(),
+              className: !table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined,
+            })
+          )
+        )
+      )
+    )
+  );
+}
+
+// ─── Row selection demo ───────────────────────────────────────────────────────
+
+function RowSelectionDemo() {
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  });
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "name", desc: true },
+  ]);
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
+  const columns: ColumnDef<SelectionMember>[] = [
+    {
+      id: "select",
+      header: ({ table }) =>
+        React.createElement(Checkbox, {
+          checked:
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() ? "indeterminate" : false),
+          onCheckedChange: (value: boolean) => table.toggleAllPageRowsSelected(!!value),
+          "aria-label": "Select all",
+        }),
+      cell: ({ row }) =>
+        React.createElement(Checkbox, {
+          checked: row.getIsSelected(),
+          onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
+          "aria-label": "Select row",
+        }),
+      enableSorting: false,
+      size: 20,
+    },
+    {
+      accessorKey: "name",
+      id: "name",
+      header: "Name",
+      size: 200,
+      enableSorting: true,
+      cell: ({ row }) =>
+        React.createElement("div", { className: "flex items-center gap-3" },
+          React.createElement(Avatar, { className: "size-8" },
+            React.createElement(AvatarImage, { src: row.original.avatar, alt: row.original.name }),
+            React.createElement(AvatarFallback, null, row.original.name.split(" ").map((n: string) => n[0]).join("")),
+            React.createElement(AvatarBadge, {
+              className: "size-1.5! p-0 " + (availabilityColor[row.original.availability] || availabilityColor.offline),
+            })
+          ),
+          React.createElement("div", { className: "space-y-px" },
+            React.createElement("div", { className: "text-foreground font-medium" }, row.original.name),
+            React.createElement("div", { className: "text-muted-foreground" }, row.original.email)
+          )
+        ),
+    },
+    {
+      accessorKey: "location",
+      header: "Location",
+      size: 180,
+      cell: ({ row }) =>
+        React.createElement("div", { className: "flex items-center gap-1.5" },
+          React.createElement("img", {
+            src: "https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg",
+            alt: row.original.flag,
+            className: "size-4 rounded-full object-cover",
+          }),
+          React.createElement("div", { className: "text-foreground font-medium" }, row.original.location)
+        ),
+    },
+    {
+      accessorKey: "joined",
+      header: "Joined",
+      size: 120,
+      cell: ({ row }) =>
+        React.createElement("span", { className: "font-medium" }, row.original.joined),
+    },
+  ];
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    columns,
+    data: selectionMembers,
+    getRowId: (row: SelectionMember) => row.id,
+    state: { pagination, sorting, rowSelection },
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const total = table.getFilteredRowModel().rows.length;
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total);
+
+  return React.createElement("div", { className: "w-full space-y-2.5" },
+    React.createElement("div", { className: "overflow-hidden rounded-md border" },
+      React.createElement(Table, null,
+        React.createElement(TableHeader, null,
+          table.getHeaderGroups().map((hg) =>
+            React.createElement(TableRow, { key: hg.id },
+              hg.headers.map((h) =>
+                React.createElement(TableHead, { key: h.id, style: { width: h.getSize() } },
+                  h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())
+                )
+              )
+            )
+          )
+        ),
+        React.createElement(TableBody, null,
+          table.getRowModel().rows.map((row) =>
+            React.createElement(TableRow, { key: row.id, "data-state": row.getIsSelected() ? "selected" : undefined } as any,
+              row.getVisibleCells().map((cell) =>
+                React.createElement(TableCell, { key: cell.id, style: { width: cell.column.getSize() } },
+                  flexRender(cell.column.columnDef.cell, cell.getContext())
+                )
+              )
+            )
+          )
+        )
+      )
+    ),
+    React.createElement("div", { className: "flex items-center justify-between" },
+      React.createElement("p", { className: "text-sm text-muted-foreground" },
+        `${start} - ${end} of ${total}`
+      ),
+      React.createElement(Pagination, { className: "w-auto mx-0" },
+        React.createElement(PaginationContent, null,
+          React.createElement(PaginationItem, null,
+            React.createElement(PaginationPrevious, {
+              onClick: (e: React.MouseEvent) => { e.preventDefault(); table.previousPage(); },
+              "aria-disabled": !table.getCanPreviousPage(),
+              className: !table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined,
+            })
+          ),
+          Array.from({ length: table.getPageCount() }, (_, i) =>
+            React.createElement(PaginationItem, { key: i },
+              React.createElement(PaginationLink, {
+                isActive: i === table.getState().pagination.pageIndex,
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.setPageIndex(i); },
+              }, i + 1)
+            )
+          ),
+          React.createElement(PaginationItem, null,
+            React.createElement(PaginationNext, {
+              onClick: (e: React.MouseEvent) => { e.preventDefault(); table.nextPage(); },
+              "aria-disabled": !table.getCanNextPage(),
+              className: !table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined,
+            })
+          )
+        )
+      )
+    )
+  );
+}
 
 // ─── Expandable row data & columns ───────────────────────────────────────────
 
@@ -2244,6 +2468,844 @@ function StickyHeaderDemo() {
   );
 }
 
+// ─── Card container demo ──────────────────────────────────────────────────────
+
+const cardColumns: ColumnDef<SelectionMember>[] = [
+  {
+    accessorKey: "name",
+    id: "name",
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "User" }),
+    size: 480,
+    enableSorting: true,
+    enableHiding: false,
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-3" },
+        React.createElement(Avatar, { className: "size-8" },
+          React.createElement(AvatarImage, { src: row.original.avatar, alt: row.original.name }),
+          React.createElement(AvatarFallback, null, row.original.name.split(" ").map((n: string) => n[0]).join(""))
+        ),
+        React.createElement("div", { className: "space-y-px" },
+          React.createElement("div", { className: "text-foreground font-medium" }, row.original.name),
+          React.createElement("div", { className: "text-muted-foreground" }, row.original.email)
+        )
+      ),
+  },
+  {
+    accessorKey: "location",
+    id: "location",
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "Location" }),
+    size: 360,
+    enableSorting: true,
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-1.5" },
+        React.createElement("img", {
+          src: "https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg",
+          alt: row.original.flag,
+          className: "size-4 rounded-full object-cover",
+        }),
+        React.createElement("div", { className: "text-foreground font-medium" }, row.original.location)
+      ),
+  },
+  {
+    accessorKey: "joined",
+    id: "joined",
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "Joined" }),
+    size: 200,
+    enableSorting: true,
+    cell: ({ row }) =>
+      React.createElement("span", { className: "font-medium" }, row.original.joined),
+  },
+];
+
+function CardContainerDemo() {
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  });
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "name", desc: true },
+  ]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    columns: cardColumns,
+    data: selectionMembers,
+    state: { pagination, sorting },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const total = table.getFilteredRowModel().rows.length;
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total);
+
+  return React.createElement(Card, { className: "w-full gap-3 py-3.5" },
+    React.createElement(CardHeader, { className: "flex items-center justify-between px-3.5" },
+      React.createElement(CardTitle, null, "Users"),
+      React.createElement(CardAction, null,
+        React.createElement(Button, { size: "sm" },
+          React.createElement(UserPlus, { "aria-hidden": true }),
+          "Add User"
+        )
+      )
+    ),
+    React.createElement("div", { className: "w-full border-y" },
+      React.createElement(Table, null,
+        React.createElement(TableHeader, null,
+          table.getHeaderGroups().map((hg) =>
+            React.createElement(TableRow, { key: hg.id },
+              hg.headers.map((h) =>
+                React.createElement(TableHead, { key: h.id, style: { width: h.getSize() } },
+                  h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())
+                )
+              )
+            )
+          )
+        ),
+        React.createElement(TableBody, null,
+          table.getRowModel().rows.map((row) =>
+            React.createElement(TableRow, { key: row.id },
+              row.getVisibleCells().map((cell) =>
+                React.createElement(TableCell, { key: cell.id, style: { width: cell.column.getSize() } },
+                  flexRender(cell.column.columnDef.cell, cell.getContext())
+                )
+              )
+            )
+          )
+        )
+      )
+    ),
+    React.createElement(CardFooter, { className: "border-none bg-transparent! px-3.5 py-0" },
+      React.createElement("div", { className: "flex w-full items-center justify-between" },
+        React.createElement("p", { className: "text-sm text-muted-foreground" },
+          `${start} - ${end} of ${total}`
+        ),
+        React.createElement(Pagination, { className: "w-auto mx-0" },
+          React.createElement(PaginationContent, null,
+            React.createElement(PaginationItem, null,
+              React.createElement(PaginationPrevious, {
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.previousPage(); },
+                "aria-disabled": !table.getCanPreviousPage(),
+                className: !table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined,
+              })
+            ),
+            Array.from({ length: table.getPageCount() }, (_, i) =>
+              React.createElement(PaginationItem, { key: i },
+                React.createElement(PaginationLink, {
+                  isActive: i === table.getState().pagination.pageIndex,
+                  onClick: (e: React.MouseEvent) => { e.preventDefault(); table.setPageIndex(i); },
+                }, i + 1)
+              )
+            ),
+            React.createElement(PaginationItem, null,
+              React.createElement(PaginationNext, {
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.nextPage(); },
+                "aria-disabled": !table.getCanNextPage(),
+                className: !table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined,
+              })
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+// ─── Column visibility demo ──────────────────────────────────────────────────
+
+const visibilityColumns: ColumnDef<SelectionMember>[] = [
+  {
+    accessorKey: "name",
+    id: "name",
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "User" }),
+    size: 200,
+    enableSorting: true,
+    enableHiding: false,
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-3" },
+        React.createElement(Avatar, { className: "size-8" },
+          React.createElement(AvatarImage, { src: row.original.avatar, alt: row.original.name }),
+          React.createElement(AvatarFallback, null, row.original.name.split(" ").map((n: string) => n[0]).join(""))
+        ),
+        React.createElement("div", { className: "space-y-px" },
+          React.createElement("div", { className: "text-foreground font-medium" }, row.original.name),
+          React.createElement("div", { className: "text-muted-foreground" }, row.original.email)
+        )
+      ),
+  },
+  {
+    accessorKey: "location",
+    id: "location",
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "Location" }),
+    size: 160,
+    enableSorting: true,
+    enableHiding: true,
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-1.5" },
+        React.createElement("img", {
+          src: "https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg",
+          alt: row.original.flag,
+          className: "size-4 rounded-full object-cover",
+        }),
+        React.createElement("div", { className: "text-foreground font-medium" }, row.original.location)
+      ),
+  },
+  {
+    accessorKey: "joined",
+    id: "joined",
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "Joined" }),
+    size: 120,
+    enableSorting: true,
+    enableHiding: true,
+    cell: ({ row }) =>
+      React.createElement("span", { className: "font-medium" }, row.original.joined),
+  },
+  {
+    accessorKey: "availability",
+    id: "status",
+    header: "Status",
+    size: 100,
+    enableSorting: true,
+    enableHiding: true,
+    cell: ({ row }) => {
+      const status = row.original.availability;
+      return status === "online" || status === "away"
+        ? React.createElement(Badge, { variant: "success" }, "Approved")
+        : React.createElement(Badge, { variant: "warning" }, "Pending");
+    },
+  },
+];
+
+function ColumnVisibilityDemo() {
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  });
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "name", desc: true },
+  ]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    columns: visibilityColumns,
+    data: selectionMembers,
+    getRowId: (row: SelectionMember) => row.id,
+    state: { pagination, sorting, columnVisibility },
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const total = table.getFilteredRowModel().rows.length;
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total);
+
+  return React.createElement(Card, { className: "w-full gap-3 py-3.5" },
+    React.createElement(CardHeader, { className: "flex items-center justify-between px-3.5" },
+      React.createElement(CardTitle, null, "Users"),
+      React.createElement(CardAction, null,
+        React.createElement(DropdownMenu, { modal: false },
+          React.createElement(DropdownMenuTrigger, { asChild: true },
+            React.createElement(Button, { variant: "outline", size: "sm" },
+              React.createElement(Settings2, { "aria-hidden": true }),
+              "Columns"
+            )
+          ),
+          React.createElement(DropdownMenuContent, { align: "end" },
+            table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) =>
+                React.createElement(DropdownMenuCheckboxItem, {
+                  key: column.id,
+                  className: "capitalize",
+                  checked: column.getIsVisible(),
+                  onCheckedChange: (value: boolean) => column.toggleVisibility(!!value),
+                }, column.id)
+              )
+          )
+        )
+      )
+    ),
+    React.createElement("div", { className: "w-full border-y" },
+      React.createElement(Table, null,
+        React.createElement(TableHeader, null,
+          table.getHeaderGroups().map((hg) =>
+            React.createElement(TableRow, { key: hg.id },
+              hg.headers.map((h) =>
+                React.createElement(TableHead, { key: h.id, style: { width: h.getSize() } },
+                  h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())
+                )
+              )
+            )
+          )
+        ),
+        React.createElement(TableBody, null,
+          table.getRowModel().rows.map((row) =>
+            React.createElement(TableRow, { key: row.id },
+              row.getVisibleCells().map((cell) =>
+                React.createElement(TableCell, { key: cell.id, style: { width: cell.column.getSize() } },
+                  flexRender(cell.column.columnDef.cell, cell.getContext())
+                )
+              )
+            )
+          )
+        )
+      )
+    ),
+    React.createElement(CardFooter, { className: "border-none bg-transparent! px-3.5 py-0" },
+      React.createElement("div", { className: "flex w-full items-center justify-between" },
+        React.createElement("p", { className: "text-sm text-muted-foreground" },
+          `${start} - ${end} of ${total}`
+        ),
+        React.createElement(Pagination, { className: "w-auto mx-0" },
+          React.createElement(PaginationContent, null,
+            React.createElement(PaginationItem, null,
+              React.createElement(PaginationPrevious, {
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.previousPage(); },
+                "aria-disabled": !table.getCanPreviousPage(),
+                className: !table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined,
+              })
+            ),
+            Array.from({ length: table.getPageCount() }, (_, i) =>
+              React.createElement(PaginationItem, { key: i },
+                React.createElement(PaginationLink, {
+                  isActive: i === table.getState().pagination.pageIndex,
+                  onClick: (e: React.MouseEvent) => { e.preventDefault(); table.setPageIndex(i); },
+                }, i + 1)
+              )
+            ),
+            React.createElement(PaginationItem, null,
+              React.createElement(PaginationNext, {
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.nextPage(); },
+                "aria-disabled": !table.getCanNextPage(),
+                className: !table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined,
+              })
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+// ─── Loading skeleton demo ────────────────────────────────────────────────────
+
+const skeletonColumns: ColumnDef<SelectionMember>[] = [
+  {
+    accessorKey: "name",
+    id: "name",
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "User" }),
+    size: 200,
+    enableSorting: true,
+    enableHiding: false,
+    cell: ({ row }) =>
+      React.createElement("div", { className: "flex items-center gap-3" },
+        React.createElement(Avatar, { className: "size-8" },
+          React.createElement(AvatarImage, { src: row.original.avatar, alt: row.original.name }),
+          React.createElement(AvatarFallback, null, row.original.name.split(" ").map((n: string) => n[0]).join(""))
+        ),
+        React.createElement("div", { className: "space-y-px" },
+          React.createElement("div", { className: "text-foreground font-medium" }, row.original.name),
+          React.createElement("div", { className: "text-muted-foreground" }, row.original.email)
+        )
+      ),
+    meta: {
+      skeleton: React.createElement("div", { className: "flex items-center gap-3" },
+        React.createElement(Skeleton, { className: "size-8 rounded-full" }),
+        React.createElement("div", { className: "space-y-1.5" },
+          React.createElement(Skeleton, { className: "h-4 w-24" }),
+          React.createElement(Skeleton, { className: "h-3.5 w-16" })
+        )
+      ),
+    },
+  },
+  {
+    accessorKey: "email",
+    id: "email",
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "Email" }),
+    size: 150,
+    enableSorting: true,
+    cell: ({ row }) =>
+      React.createElement("span", { className: "text-muted-foreground" }, row.original.email),
+    meta: {
+      skeleton: React.createElement(Skeleton, { className: "h-4 w-28" }),
+    },
+  },
+  {
+    accessorKey: "availability",
+    id: "status",
+    header: "Status",
+    size: 100,
+    enableSorting: true,
+    cell: ({ row }) => {
+      const status = row.original.availability;
+      return status === "online" || status === "away"
+        ? React.createElement(Badge, { variant: "success" }, "Approved")
+        : React.createElement(Badge, { variant: "warning" }, "Pending");
+    },
+    meta: {
+      skeleton: React.createElement(Skeleton, { className: "h-5 w-16 rounded-full" }),
+    },
+  },
+];
+
+function LoadingSkeletonDemo() {
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  });
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "name", desc: true },
+  ]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    columns: skeletonColumns,
+    data: selectionMembers,
+    getRowId: (row: SelectionMember) => row.id,
+    state: { pagination, sorting },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const total = table.getFilteredRowModel().rows.length;
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total);
+  const skeletonRows = Array.from({ length: pagination.pageSize });
+
+  return React.createElement(Card, { className: "w-full gap-3 py-3.5" },
+    React.createElement(CardHeader, { className: "flex items-center justify-between px-3.5" },
+      React.createElement(CardTitle, null, "Employees"),
+      React.createElement(CardAction, null,
+        React.createElement(Button, {
+          variant: "outline",
+          size: "sm",
+          onClick: () => setIsLoading((p) => !p),
+        }, isLoading ? "Disable Loading" : "Enable Loading")
+      )
+    ),
+    React.createElement("div", { className: "w-full border-y" },
+      React.createElement(Table, null,
+        React.createElement(TableHeader, null,
+          table.getHeaderGroups().map((hg) =>
+            React.createElement(TableRow, { key: hg.id },
+              hg.headers.map((h) =>
+                React.createElement(TableHead, { key: h.id, style: { width: h.getSize() } },
+                  h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())
+                )
+              )
+            )
+          )
+        ),
+        React.createElement(TableBody, null,
+          isLoading
+            ? skeletonRows.map((_, i) =>
+                React.createElement(TableRow, { key: `skeleton-${i}` },
+                  table.getAllLeafColumns().map((col) =>
+                    React.createElement(TableCell, { key: col.id, style: { width: col.getSize() } },
+                      (col.columnDef.meta as any)?.skeleton ?? React.createElement(Skeleton, { className: "h-4 w-full" })
+                    )
+                  )
+                )
+              )
+            : table.getRowModel().rows.map((row) =>
+                React.createElement(TableRow, { key: row.id },
+                  row.getVisibleCells().map((cell) =>
+                    React.createElement(TableCell, { key: cell.id, style: { width: cell.column.getSize() } },
+                      flexRender(cell.column.columnDef.cell, cell.getContext())
+                    )
+                  )
+                )
+              )
+        )
+      )
+    ),
+    React.createElement(CardFooter, { className: "border-none bg-transparent! px-3.5 py-0" },
+      React.createElement("div", { className: "flex w-full items-center justify-between" },
+        isLoading
+          ? React.createElement("div", { className: "flex w-full items-center justify-between" },
+              React.createElement(Skeleton, { className: "h-4 w-32" }),
+              React.createElement("div", { className: "flex gap-1" },
+                React.createElement(Skeleton, { className: "size-8 rounded-md" }),
+                React.createElement(Skeleton, { className: "size-8 rounded-md" }),
+                React.createElement(Skeleton, { className: "size-8 rounded-md" }),
+                React.createElement(Skeleton, { className: "size-8 rounded-md" })
+              )
+            )
+          : React.createElement(React.Fragment, null,
+              React.createElement("p", { className: "text-sm text-muted-foreground" },
+                `${start} - ${end} of ${total}`
+              ),
+              React.createElement(Pagination, { className: "w-auto mx-0" },
+                React.createElement(PaginationContent, null,
+                  React.createElement(PaginationItem, null,
+                    React.createElement(PaginationPrevious, {
+                      onClick: (e: React.MouseEvent) => { e.preventDefault(); table.previousPage(); },
+                      "aria-disabled": !table.getCanPreviousPage(),
+                      className: !table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined,
+                    })
+                  ),
+                  Array.from({ length: table.getPageCount() }, (_, i) =>
+                    React.createElement(PaginationItem, { key: i },
+                      React.createElement(PaginationLink, {
+                        isActive: i === table.getState().pagination.pageIndex,
+                        onClick: (e: React.MouseEvent) => { e.preventDefault(); table.setPageIndex(i); },
+                      }, i + 1)
+                    )
+                  ),
+                  React.createElement(PaginationItem, null,
+                    React.createElement(PaginationNext, {
+                      onClick: (e: React.MouseEvent) => { e.preventDefault(); table.nextPage(); },
+                      "aria-disabled": !table.getCanNextPage(),
+                      className: !table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined,
+                    })
+                  )
+                )
+              )
+            )
+      )
+    )
+  );
+}
+
+// ─── CRUD data ────────────────────────────────────────────────────────────────
+
+interface CrudMember {
+  id: string;
+  name: string;
+  avatar: string;
+  status: "Active" | "Inactive" | "Pending" | "Blocked";
+  flag: string;
+  email: string;
+  role: string;
+  joined: string;
+  location: string;
+}
+
+const crudData: CrudMember[] = [
+  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "Active",   flag: "us", email: "alex@apple.com",      role: "CEO",              joined: "Jan, 2024", location: "United States" },
+  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "Inactive", flag: "gb", email: "sarah@openai.com",    role: "CTO",              joined: "Mar, 2023", location: "United Kingdom" },
+  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", status: "Blocked",  flag: "ca", email: "michael@meta.com",    role: "Designer",         joined: "Jun, 2022", location: "Canada" },
+  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", status: "Inactive", flag: "au", email: "emma@tesla.com",      role: "Developer",        joined: "Sep, 2024", location: "Australia" },
+  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", status: "Active",   flag: "de", email: "david@sap.com",       role: "Lawyer",           joined: "Nov, 2023", location: "Germany" },
+  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", status: "Pending",  flag: "my", email: "aron@keenthemes.com", role: "Director",         joined: "Feb, 2022", location: "Malaysia" },
+  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", status: "Inactive", flag: "es", email: "james@bbva.es",       role: "Product Manager",  joined: "Aug, 2024", location: "Spain" },
+  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", status: "Blocked",  flag: "jp", email: "maria@sony.jp",       role: "Marketing Lead",   joined: "Dec, 2023", location: "Japan" },
+  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", status: "Pending",  flag: "fr", email: "nick@lvmh.fr",        role: "Data Scientist",   joined: "Apr, 2022", location: "France" },
+  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", status: "Inactive", flag: "it", email: "liam@eni.it",         role: "Engineer",         joined: "Jul, 2024", location: "Italy" },
+  { id: "11", name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "Blocked",  flag: "br", email: "alex@vale.br",        role: "Software Engineer",joined: "May, 2023", location: "Brazil" },
+  { id: "12", name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "Active",   flag: "in", email: "sarah@tata.in",       role: "Sales Manager",    joined: "Oct, 2024", location: "India" },
+];
+
+function CrudActionsCell({ row }: { row: Row<CrudMember> }) {
+  return React.createElement(
+    DropdownMenu, { modal: false },
+    React.createElement(
+      "div", null,
+      React.createElement(Button, { className: "size-7", size: "icon", variant: "ghost", asChild: true },
+        React.createElement(DropdownMenuTrigger, null, React.createElement(MoreHorizontal))
+      )
+    ),
+    React.createElement(
+      DropdownMenuContent, { side: "bottom", align: "start" },
+      React.createElement(DropdownMenuItem, { onClick: () => {} }, "Edit"),
+      React.createElement(DropdownMenuItem, {
+        onClick: () => {
+          navigator.clipboard.writeText(row.original.id);
+          toast.success("Employee ID copied", { description: row.original.id });
+        },
+      }, "Copy ID"),
+      React.createElement(DropdownMenuSeparator),
+      React.createElement(DropdownMenuItem, { variant: "destructive", onClick: () => {} }, "Delete"),
+    ),
+  );
+}
+
+function CrudDemo() {
+  const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: 0, pageSize: 5 });
+  const [sorting, setSorting] = React.useState<SortingState>([{ id: "name", desc: true }]);
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [selectedStatuses, setSelectedStatuses] = React.useState<string[]>([]);
+
+  const filteredData = React.useMemo(() => {
+    return crudData.filter((item) => {
+      const matchesStatus = !selectedStatuses.length || selectedStatuses.includes(item.status);
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || Object.values(item).join(" ").toLowerCase().includes(searchLower);
+      return matchesStatus && matchesSearch;
+    });
+  }, [searchQuery, selectedStatuses]);
+
+  const statusCounts = React.useMemo(() => {
+    return crudData.reduce((acc, item) => {
+      acc[item.status] = (acc[item.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, []);
+
+  const handleStatusChange = (checked: boolean, value: string) => {
+    setSelectedStatuses((prev) =>
+      checked ? [...prev, value] : prev.filter((v) => v !== value)
+    );
+  };
+
+  const columns = React.useMemo<ColumnDef<CrudMember>[]>(() => [
+    {
+      accessorKey: "id",
+      id: "id",
+      header: ({ table: t }) =>
+        React.createElement(Checkbox, {
+          checked: t.getIsAllPageRowsSelected() || (t.getIsSomePageRowsSelected() && "indeterminate"),
+          onCheckedChange: (value: boolean) => t.toggleAllPageRowsSelected(!!value),
+          "aria-label": "Select all",
+        }),
+      cell: ({ row }) =>
+        React.createElement(Checkbox, {
+          checked: row.getIsSelected(),
+          onCheckedChange: (value: boolean) => row.toggleSelected(!!value),
+          "aria-label": "Select row",
+        }),
+      enableSorting: false,
+      size: 35,
+    },
+    {
+      accessorKey: "name",
+      id: "name",
+      header: ({ column }) => React.createElement(DataTableColumnHeader, { column, title: "User" }),
+      cell: ({ row }) =>
+        React.createElement("div", { className: "flex items-center gap-3" },
+          React.createElement(Avatar, { className: "size-8" },
+            React.createElement(AvatarImage, { src: row.original.avatar, alt: row.original.name }),
+            React.createElement(AvatarFallback, null, row.original.name.split(" ").map((n: string) => n[0]).join("")),
+          ),
+          React.createElement("div", { className: "space-y-px" },
+            React.createElement("div", { className: "text-foreground font-medium" }, row.original.name),
+            React.createElement("div", { className: "text-muted-foreground" }, row.original.email),
+          ),
+        ),
+      size: 200,
+      enableSorting: true,
+    },
+    {
+      accessorKey: "location",
+      id: "location",
+      header: ({ column }) => React.createElement(DataTableColumnHeader, { column, title: "Location" }),
+      cell: ({ row }) =>
+        React.createElement("div", { className: "flex items-center gap-1.5" },
+          React.createElement("img", {
+            src: `https://flagcdn.com/${row.original.flag.toLowerCase()}.svg`,
+            alt: row.original.flag,
+            className: "size-4 rounded-full object-cover",
+          }),
+          React.createElement("div", { className: "text-foreground font-medium" }, row.original.location),
+        ),
+      size: 150,
+      enableSorting: true,
+    },
+    {
+      accessorKey: "role",
+      id: "role",
+      header: ({ column }) => React.createElement(DataTableColumnHeader, { column, title: "Role" }),
+      cell: ({ row }) => React.createElement("div", { className: "text-foreground font-medium" }, row.original.role),
+      size: 150,
+      enableSorting: true,
+    },
+    {
+      accessorKey: "joined",
+      id: "joined",
+      header: ({ column }) => React.createElement(DataTableColumnHeader, { column, title: "Joined" }),
+      cell: ({ row }) => React.createElement("div", { className: "text-foreground font-medium" }, row.original.joined),
+      size: 150,
+      enableSorting: true,
+    },
+    {
+      accessorKey: "status",
+      id: "status",
+      header: ({ column }) => React.createElement(DataTableColumnHeader, { column, title: "Status" }),
+      cell: ({ row }) => {
+        const s = row.original.status;
+        if (s === "Active") return React.createElement(Badge, { variant: "success" }, "Approved");
+        if (s === "Blocked") return React.createElement(Badge, { variant: "destructive" }, "Blocked");
+        if (s === "Inactive") return React.createElement(Badge, { variant: "info" }, "Inactive");
+        return React.createElement(Badge, { variant: "warning" }, "Pending");
+      },
+      size: 100,
+      enableSorting: true,
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => React.createElement(CrudActionsCell, { row }),
+      size: 60,
+      enableSorting: false,
+    },
+  ], []);
+
+  const table = useReactTable({
+    columns,
+    data: filteredData,
+    getRowId: (row) => row.id,
+    state: { pagination, sorting, rowSelection },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  const total = table.getFilteredRowModel().rows.length;
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total);
+
+  return React.createElement(Card, { className: "w-full gap-3 py-0" },
+    React.createElement(CardHeader, { className: "flex items-center justify-between px-3.5 py-2" },
+      React.createElement("div", { className: "flex items-center gap-2.5" },
+        // Search input
+        React.createElement(InputGroup, { className: "w-48" },
+          React.createElement(InputGroupAddon, { align: "inline-start" }, React.createElement(Search)),
+          React.createElement(InputGroupInput, {
+            placeholder: "Search...",
+            value: searchQuery,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value),
+          }),
+          searchQuery.length > 0 && React.createElement(InputGroupAddon, { align: "inline-end" },
+            React.createElement(InputGroupButton, {
+              "aria-label": "Clear",
+              size: "icon-xs",
+              onClick: () => setSearchQuery(""),
+            }, React.createElement(X)),
+          ),
+        ),
+        // Status filter popover
+        React.createElement(Popover, null,
+          React.createElement(PopoverTrigger, { asChild: true },
+            React.createElement(Button, { variant: "outline" },
+              React.createElement(Filter),
+              "Status",
+              selectedStatuses.length > 0 &&
+                React.createElement(Badge, { size: "sm", variant: "info" }, selectedStatuses.length),
+            ),
+          ),
+          React.createElement(PopoverContent, { className: "w-40", align: "start" },
+            React.createElement("div", { className: "space-y-3" },
+              React.createElement("div", { className: "text-muted-foreground text-xs font-medium" }, "Filters"),
+              React.createElement("div", { className: "space-y-3" },
+                ...Object.keys(statusCounts).map((status) =>
+                  React.createElement("div", { key: status, className: "flex items-center gap-2.5" },
+                    React.createElement(Checkbox, {
+                      id: `crud-${status}`,
+                      checked: selectedStatuses.includes(status),
+                      onCheckedChange: (checked: boolean) => handleStatusChange(checked === true, status),
+                    }),
+                    React.createElement(Label, {
+                      htmlFor: `crud-${status}`,
+                      className: "flex grow items-center justify-between gap-1.5 font-normal",
+                    },
+                      status,
+                      React.createElement("span", { className: "text-muted-foreground" }, statusCounts[status]),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      React.createElement(CardAction, null,
+        React.createElement(Button, null,
+          React.createElement(UserPlus),
+          "Add new",
+        ),
+      ),
+    ),
+    React.createElement(CardContent, { className: "border-y px-0" },
+      React.createElement(ScrollArea, null,
+        React.createElement(Table, null,
+          React.createElement(TableHeader, null,
+            ...table.getHeaderGroups().map((hg) =>
+              React.createElement(TableRow, { key: hg.id },
+                ...hg.headers.map((h) =>
+                  React.createElement(TableHead, { key: h.id, style: { width: h.getSize() } },
+                    h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext()),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          React.createElement(TableBody, null,
+            ...table.getRowModel().rows.map((row) =>
+              React.createElement(TableRow, Object.assign({ key: row.id }, row.getIsSelected() ? { "data-state": "selected" } : {}),
+                ...row.getVisibleCells().map((cell) =>
+                  React.createElement(TableCell, { key: cell.id, style: { width: cell.column.getSize() } },
+                    flexRender(cell.column.columnDef.cell, cell.getContext()),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+    React.createElement(CardFooter, { className: "border-none bg-transparent! px-3.5 py-2" },
+      React.createElement("div", { className: "flex w-full items-center justify-between" },
+        React.createElement("p", { className: "text-sm text-muted-foreground" }, `${start} - ${end} of ${total}`),
+        React.createElement(Pagination, { className: "w-auto mx-0" },
+          React.createElement(PaginationContent, null,
+            React.createElement(PaginationItem, null,
+              React.createElement(PaginationPrevious, {
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.previousPage(); },
+                "aria-disabled": !table.getCanPreviousPage(),
+                className: !table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined,
+              }),
+            ),
+            ...Array.from({ length: table.getPageCount() }, (_, i) =>
+              React.createElement(PaginationItem, { key: i },
+                React.createElement(PaginationLink, {
+                  isActive: i === table.getState().pagination.pageIndex,
+                  onClick: (e: React.MouseEvent) => { e.preventDefault(); table.setPageIndex(i); },
+                }, i + 1),
+              ),
+            ),
+            React.createElement(PaginationItem, null,
+              React.createElement(PaginationNext, {
+                onClick: (e: React.MouseEvent) => { e.preventDefault(); table.nextPage(); },
+                "aria-disabled": !table.getCanNextPage(),
+                className: !table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined,
+              }),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 // ─── ComponentDoc ─────────────────────────────────────────────────────────────
 
 export const dataTableDoc: ComponentDoc = {
@@ -2292,39 +3354,29 @@ export function PatientListPage() {
 import * as React from "react"
 import { type ColumnDef } from "@tanstack/react-table"
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DataTable,
-  DataTableColumnHeader,
-  DataTableRowActions,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/data-table"
+import { DataTable } from "@/components/ui/data-table"
 
-type Patient = {
-  id: string      // "OHC-0041"
+type Member = {
+  id: string
   name: string
-  age: number
-  gender: "M" | "F"
-  ward: string
-  bed: string
-  diagnosis: string
-  status: "admitted" | "critical" | "stable" | "discharged"
+  availability: "online" | "away" | "busy" | "offline"
+  avatar: string
+  flag: string
+  email: string
+  location: string
+  joined: string
 }
 
-const patientStatusVariant = {
-  stable:     "success",
-  admitted:   "info",
-  critical:   "destructive",
-  discharged: "neutral",
+const availabilityColor = {
+  online: "bg-green-500",
+  away: "bg-yellow-500",
+  busy: "bg-orange-500",
+  offline: "bg-gray-400",
 } as const
 
-const getInitials = (name: string) =>
-  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
-
-export const columns: ColumnDef<Patient>[] = [
+const columns: ColumnDef<Member>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -2346,80 +3398,63 @@ export const columns: ColumnDef<Patient>[] = [
     ),
     enableSorting: false,
     enableHiding: false,
+    size: 20,
   },
   {
-    id: "patient",
     accessorKey: "name",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Patient" />,
+    id: "name",
+    header: "Name",
+    size: 200,
     cell: ({ row }) => (
       <div className="flex items-center gap-3">
-        <Avatar shape="rounded">
-          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        <Avatar className="size-8">
+          <AvatarImage src={row.original.avatar} alt={row.original.name} />
+          <AvatarFallback>
+            {row.original.name.split(" ").map((n) => n[0]).join("")}
+          </AvatarFallback>
+          <AvatarBadge
+            className={\`size-1.5! p-0 \${availabilityColor[row.original.availability]}\`}
+          />
         </Avatar>
-        <div className="flex flex-col">
-          <span className="font-medium">{row.original.name}</span>
-          <span className="text-muted-foreground text-xs">{row.original.id}</span>
+        <div className="space-y-px">
+          <div className="text-foreground font-medium">{row.original.name}</div>
+          <div className="text-muted-foreground">{row.original.email}</div>
         </div>
       </div>
     ),
   },
   {
-    id: "demographics",,
-    header: "Age / Gender",
+    accessorKey: "location",
+    header: "Location",
+    size: 180,
     cell: ({ row }) => (
-      <span className="text-sm tabular-nums">
-        {row.original.age}y {row.original.gender}
-      </span>
-    ),
-  },
-  {
-    id: "location",
-    header: "Ward / Bed",
-    cell: ({ row }) => (
-      <div className="flex flex-col">
-        <span className="font-medium text-sm">{row.original.ward}</span>
-        <span className="text-muted-foreground text-xs">{row.original.bed}</span>
+      <div className="flex items-center gap-1.5">
+        <img
+          src={\`https://flagcdn.com/\${row.original.flag.toLowerCase()}.svg\`}
+          alt={row.original.flag}
+          className="size-4 rounded-full object-cover"
+        />
+        <div className="text-foreground font-medium">{row.original.location}</div>
       </div>
     ),
   },
   {
-    accessorKey: "diagnosis",
-    header: "Diagnosis",
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
+    accessorKey: "joined",
+    header: "Joined",
+    size: 120,
     cell: ({ row }) => (
-      <Badge variant={patientStatusVariant[row.getValue("status") as Patient["status"]]}>
-        {row.getValue("status")}
-      </Badge>
-    ),
-  },
-  {
-    id: "actions",
-    enableHiding: false,
-    meta: { className: "w-0" },
-    cell: ({ row }) => (
-      <DataTableRowActions>
-        <DropdownMenuItem>View record</DropdownMenuItem>
-        <DropdownMenuItem>Edit details</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>Add note</DropdownMenuItem>
-        <DropdownMenuItem>Prescribe medication</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>Discharge patient</DropdownMenuItem>
-      </DataTableRowActions>
+      <span className="font-medium">{row.original.joined}</span>
     ),
   },
 ]
 
-export function PatientListDemo() {
+export function MemberListDemo() {
   return (
     <DataTable
       columns={columns}
-      data={patients}
+      data={members}
       filterColumn="name"
-      filterPlaceholder="Search patients..."
+      filterPlaceholder="Search members..."
     />
   )
 }`,
@@ -3247,84 +4282,123 @@ export function ResizableColumnsTable() {
         "Click the pin icon in any column header to stick it to the left edge while the rest of the table scrolls. Click the filled pin to unpin. The Name column is pinned by default. Columns are sortable and the table is paginated.",
       code: `"use client"
 
-import { useState } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { DataTableColumnHeader, DataTablePinContext } from "@/components/ui/data-table"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  type ColumnDef,
-  type PaginationState,
-  type SortingState,
-  flexRender,
-  getCoreRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table"
+import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table"
+import { type ColumnDef } from "@tanstack/react-table"
 
 type Member = {
   id: string
   name: string
+  availability: "online" | "away" | "busy" | "offline"
   avatar: string
+  status: "active" | "inactive"
+  flag: string
   email: string
   company: string
   role: string
+  joined: string
   location: string
-  status: "active" | "inactive"
 }
 
 const members: Member[] = [
-  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", email: "alex@apple.com",    company: "Apple",      role: "CEO",             location: "United States",  status: "active"   },
-  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", email: "sarah@openai.com",  company: "OpenAI",     role: "CTO",             location: "United Kingdom", status: "inactive" },
-  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", email: "michael@meta.com",  company: "Meta",       role: "Designer",        location: "Canada",         status: "active"   },
-  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", email: "emma@tesla.com",    company: "Tesla",      role: "Developer",       location: "Australia",      status: "inactive" },
-  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", email: "david@sap.com",     company: "SAP",        role: "Lawyer",          location: "Germany",        status: "inactive" },
-  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", email: "aron@keen.com",     company: "Keenthemes", role: "Director",        location: "Malaysia",       status: "active"   },
-  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", email: "james@bbva.es",     company: "BBVA",       role: "Product Manager", location: "Spain",          status: "inactive" },
-  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", email: "maria@sony.jp",     company: "Sony",       role: "Marketing Lead",  location: "Japan",          status: "inactive" },
-  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", email: "nick@lvmh.fr",      company: "LVMH",       role: "Data Scientist",  location: "France",         status: "inactive" },
-  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", email: "liam@eni.it",       company: "ENI",        role: "Engineer",        location: "Italy",          status: "inactive" },
-  { id: "11", name: "Pooja Iyer",        avatar: "https://images.unsplash.com/photo-1619946794135-5bc917a27793?w=96&h=96&dpr=2&q=80", email: "pooja@tata.in",     company: "Tata",       role: "Sales Manager",   location: "India",          status: "active"   },
+  { id: "1",  name: "Alex Johnson",      availability: "online",  avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "active",   flag: "us", email: "alex@apple.com",       company: "Apple",      role: "CEO",              joined: "Jan, 2024", location: "United States"  },
+  { id: "2",  name: "Sarah Chen",        availability: "away",    avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "gb", email: "sarah@openai.com",     company: "OpenAI",     role: "CTO",              joined: "Mar, 2023", location: "United Kingdom" },
+  { id: "3",  name: "Michael Rodriguez", availability: "busy",    avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", status: "active",   flag: "ca", email: "michael@meta.com",     company: "Meta",       role: "Designer",         joined: "Jun, 2022", location: "Canada"         },
+  { id: "4",  name: "Emma Wilson",       availability: "offline", avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "au", email: "emma@tesla.com",       company: "Tesla",      role: "Developer",        joined: "Sep, 2024", location: "Australia"      },
+  { id: "5",  name: "David Kim",         availability: "online",  avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", status: "active",   flag: "de", email: "david@sap.com",        company: "SAP",        role: "Lawyer",           joined: "Nov, 2023", location: "Germany"        },
+  { id: "6",  name: "Aron Thompson",     availability: "away",    avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", status: "active",   flag: "my", email: "aron@keenthemes.com",  company: "Keenthemes", role: "Director",         joined: "Feb, 2022", location: "Malaysia"       },
+  { id: "7",  name: "James Brown",       availability: "busy",    avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "es", email: "james@bbva.es",        company: "BBVA",       role: "Product Manager",  joined: "Aug, 2024", location: "Spain"          },
+  { id: "8",  name: "Maria Garcia",      availability: "offline", avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", status: "active",   flag: "jp", email: "maria@sony.jp",        company: "Sony",       role: "Marketing Lead",   joined: "Dec, 2023", location: "Japan"          },
+  { id: "9",  name: "Nick Johnson",      availability: "online",  avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "fr", email: "nick@lvmh.fr",         company: "LVMH",       role: "Data Scientist",   joined: "Apr, 2022", location: "France"         },
+  { id: "10", name: "Liam Thompson",     availability: "away",    avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", status: "inactive", flag: "it", email: "liam@eni.it",          company: "ENI",        role: "Engineer",         joined: "Jul, 2024", location: "Italy"          },
+  { id: "11", name: "Alex Johnson",      availability: "busy",    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "active",   flag: "br", email: "alex@vale.br",         company: "Vale",       role: "Software Engineer", joined: "May, 2023", location: "Brazil"        },
+  { id: "12", name: "Sarah Chen",        availability: "offline", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "active",   flag: "in", email: "sarah@tata.in",        company: "Tata",       role: "Sales Manager",    joined: "Oct, 2024", location: "India"          },
 ]
-
-const getInitials = (name: string) =>
-  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
 
 const columns: ColumnDef<Member>[] = [
   {
     id: "name",
     accessorKey: "name",
+    size: 220,
     enableSorting: true,
     enableHiding: false,
     header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
     cell: ({ row }) => (
-      <div className="flex items-center gap-3">
-        <Avatar shape="circle">
+      <div className="flex items-center gap-2">
+        <Avatar className="size-6" shape="circle">
           <AvatarImage src={row.original.avatar} alt={row.original.name} />
-          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+          <AvatarFallback>
+            {row.original.name.split(" ").map((n) => n[0]).join("")}
+          </AvatarFallback>
         </Avatar>
-        <span className="font-medium text-sm whitespace-nowrap">{row.original.name}</span>
+        <span className="text-foreground font-medium whitespace-nowrap">{row.original.name}</span>
       </div>
     ),
   },
-  { id: "email",    accessorKey: "email",    enableSorting: true,  header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,      cell: ({ row }) => <span className="text-muted-foreground text-sm whitespace-nowrap">{row.original.email}</span> },
-  { id: "company",  accessorKey: "company",  enableSorting: true,  header: ({ column }) => <DataTableColumnHeader column={column} title="Company" />,    cell: ({ row }) => <span className="font-medium text-sm whitespace-nowrap">{row.original.company}</span> },
-  { id: "role",     accessorKey: "role",     enableSorting: true,  header: ({ column }) => <DataTableColumnHeader column={column} title="Occupation" />, cell: ({ row }) => <span className="text-sm whitespace-nowrap">{row.original.role}</span> },
-  { id: "location", accessorKey: "location", enableSorting: true,  header: ({ column }) => <DataTableColumnHeader column={column} title="Location" />,   cell: ({ row }) => <span className="text-sm whitespace-nowrap">{row.original.location}</span> },
+  {
+    id: "email",
+    accessorKey: "email",
+    size: 220,
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,
+    cell: ({ row }) => (
+      <span className="text-muted-foreground text-sm whitespace-nowrap">{row.original.email}</span>
+    ),
+  },
+  {
+    id: "location",
+    accessorKey: "location",
+    size: 180,
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Location" />,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-1.5">
+        <img
+          src={\`https://flagcdn.com/\${row.original.flag.toLowerCase()}.svg\`}
+          alt={row.original.flag}
+          className="size-4 rounded-full object-cover"
+        />
+        <span className="text-foreground font-medium whitespace-nowrap">{row.original.location}</span>
+      </div>
+    ),
+  },
+  {
+    id: "company",
+    accessorKey: "company",
+    size: 160,
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Company" />,
+    cell: ({ row }) => (
+      <span className="font-medium text-sm whitespace-nowrap">{row.original.company}</span>
+    ),
+  },
+  {
+    id: "role",
+    accessorKey: "role",
+    size: 180,
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Role" />,
+    cell: ({ row }) => (
+      <span className="text-sm whitespace-nowrap">{row.original.role}</span>
+    ),
+  },
+  {
+    id: "joined",
+    accessorKey: "joined",
+    size: 120,
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Joined" />,
+    cell: ({ row }) => (
+      <span className="font-medium text-sm whitespace-nowrap">{row.original.joined}</span>
+    ),
+  },
   {
     id: "status",
     accessorKey: "status",
+    size: 140,
     enableSorting: false,
-    header: "Status",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
     cell: ({ row }) =>
       row.original.status === "active"
         ? <Badge variant="success">Approved</Badge>
@@ -3333,124 +4407,15 @@ const columns: ColumnDef<Member>[] = [
 ]
 
 export function PinnableColumnsTable() {
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 5,
-  })
-
-  const table = useReactTable({
-    data: members,
-    columns,
-    state: { sorting, pagination },
-    onSortingChange: setSorting,
-    onPaginationChange: setPagination,
-    initialState: {
-      columnPinning: { left: ["name"] },
-    },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-  })
-
   return (
-    <DataTablePinContext.Provider value={true}>
-      <div className="flex flex-col gap-4 w-full">
-        <div className="overflow-x-auto rounded-md border [&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r">
-          <Table className="w-max">
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    const isPinned = header.column.getIsPinned()
-                    return (
-                      <TableHead
-                        key={header.id}
-                        style={isPinned ? {
-                          position: "sticky",
-                          left: isPinned === "left" ? header.column.getStart("left") : undefined,
-                          right: isPinned === "right" ? header.column.getAfter("right") : undefined,
-                          zIndex: 1,
-                          boxShadow: isPinned === "left" ? "inset -0.5px 0 0 0 var(--border)" : "inset 0.5px 0 0 0 var(--border)",
-                        } : undefined}
-                        className={isPinned ? "bg-background" : ""}
-                      >
-                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => {
-                    const isPinned = cell.column.getIsPinned()
-                    return (
-                      <TableCell
-                        key={cell.id}
-                        style={isPinned ? {
-                          position: "sticky",
-                          left: isPinned === "left" ? cell.column.getStart("left") : undefined,
-                          right: isPinned === "right" ? cell.column.getAfter("right") : undefined,
-                          zIndex: 1,
-                          boxShadow: isPinned === "left" ? "inset -0.5px 0 0 0 var(--border)" : "inset 0.5px 0 0 0 var(--border)",
-                        } : undefined}
-                        className={isPinned ? "bg-background" : ""}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {(() => {
-              const { pageIndex, pageSize } = table.getState().pagination;
-              const total = table.getFilteredRowModel
-                ? table.getFilteredRowModel().rows.length
-                : table.getCoreRowModel().rows.length;
-              const start = total === 0 ? 0 : pageIndex * pageSize + 1;
-              const end = Math.min((pageIndex + 1) * pageSize, total);
-              return start + " - " + end + " of " + total;
-            })()}
-          </p>
-          <Pagination className="w-auto mx-0">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={(e) => { e.preventDefault(); table.previousPage(); }}
-                  aria-disabled={!table.getCanPreviousPage()}
-                  className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
-                />
-              </PaginationItem>
-              {Array.from({ length: table.getPageCount() }, (_, i) => (
-                <PaginationItem key={i}>
-                  <PaginationLink
-                    isActive={i === table.getState().pagination.pageIndex}
-                    onClick={(e) => { e.preventDefault(); table.setPageIndex(i); }}
-                  >
-                    {i + 1}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={(e) => { e.preventDefault(); table.nextPage(); }}
-                  aria-disabled={!table.getCanNextPage()}
-                  className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      </div>
-    </DataTablePinContext.Provider>
+    <DataTable
+      columns={columns}
+      data={members}
+      filterColumn="name"
+      filterPlaceholder="Search members..."
+      pinnable
+      initialPinning={{ left: ["name"] }}
+    />
   )
 }`,
 
@@ -3618,83 +4583,191 @@ export function DensePatientTable() {
     {
       name: "Auto Width",
       description:
-        "Table columns size to their content instead of stretching to fill the container — ideal for compact reference tables where consistent column widths are not needed.",
+        "Table columns size to their content instead of stretching to fill the container. Uses `w-auto` on the Table, avatar + name link, email, location with flag, and joined date columns with CareUI Pagination.",
       code: `"use client"
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { DataTable } from "@/components/ui/data-table"
-import { type ColumnDef } from "@tanstack/react-table"
+import { useState, useMemo } from "react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  type ColumnDef,
+  type PaginationState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
 
-const getInitials = (name: string) =>
-  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+interface IData {
+  id: string
+  name: string
+  avatar: string
+  flag: string
+  email: string
+  location: string
+  joined: string
+}
 
-const patientStatusVariant = {
-  stable:     "success",
-  admitted:   "info",
-  critical:   "destructive",
-  discharged: "neutral",
-} as const
-
-const columns: ColumnDef<Patient>[] = [
-  {
-    id: "patient",
-    accessorKey: "name",
-    header: "Name",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-2">
-        <Avatar shape="rounded" size="sm">
-          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
-        </Avatar>
-        <span className="font-medium whitespace-nowrap">{row.original.name}</span>
-      </div>
-    ),
-  },
-  {
-    accessorKey: "ward",
-    header: "Ward / Bed",
-    cell: ({ row }) => (
-      <span className="whitespace-nowrap text-sm">
-        {row.original.ward} · {row.original.bed}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "diagnosis",
-    header: "Diagnosis",
-    cell: ({ row }) => (
-      <span className="whitespace-nowrap">{row.original.diagnosis}</span>
-    ),
-  },
-  {
-    id: "age",
-    header: "Age",
-    cell: ({ row }) => (
-      <span className="tabular-nums text-sm whitespace-nowrap">
-        {row.original.age}y {row.original.gender}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant={patientStatusVariant[row.getValue("status") as Patient["status"]]}>
-        {row.getValue("status")}
-      </Badge>
-    ),
-  },
+const data: IData[] = [
+  { id: "1", name: "Alex Johnson", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "us", email: "alex@apple.com", location: "United States", joined: "Jan, 2026" },
+  { id: "2", name: "Sarah Chen", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "gb", email: "sarah@openai.com", location: "United Kingdom", joined: "Jul, 2025" },
+  { id: "3", name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", flag: "ca", email: "michael@meta.com", location: "Canada", joined: "Mar, 2019" },
+  { id: "4", name: "Emma Wilson", avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", flag: "au", email: "emma@tesla.com", location: "Australia", joined: "Jan, 2024" },
+  { id: "5", name: "David Kim", avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", flag: "de", email: "david@sap.com", location: "Germany", joined: "May, 2023" },
+  { id: "6", name: "Aron Thompson", avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", flag: "my", email: "aron@keenthemes.com", location: "Malaysia", joined: "Nov, 2018" },
+  { id: "7", name: "James Brown", avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", flag: "es", email: "james@bbva.es", location: "Spain", joined: "Jun, 2021" },
+  { id: "8", name: "Maria Garcia", avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", flag: "jp", email: "maria@sony.jp", location: "Japan", joined: "Oct, 2020" },
+  { id: "9", name: "Nick Johnson", avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", flag: "fr", email: "nick@lvmh.fr", location: "France", joined: "Sep, 2019" },
+  { id: "10", name: "Liam Thompson", avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", flag: "it", email: "liam@eni.it", location: "Italy", joined: "Feb, 2023" },
+  { id: "11", name: "Alex Johnson", avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "br", email: "alex@vale.br", location: "Brazil", joined: "Dec, 2022" },
+  { id: "12", name: "Sarah Chen", avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "in", email: "sarah@tata.in", location: "India", joined: "Mar, 2020" },
 ]
 
-export function AutoWidthPatientTable() {
+export function AutoWidthDemo() {
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 5 })
+  const [sorting, setSorting] = useState<SortingState>([{ id: "name", desc: true }])
+
+  const columns = useMemo<ColumnDef<IData>[]>(() => [
+    {
+      accessorKey: "name",
+      header: "Name",
+      size: 225,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Avatar className="size-6">
+            <AvatarImage src={row.original.avatar} alt={row.original.name} />
+            <AvatarFallback>{row.original.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+          </Avatar>
+          <a href="#" className="text-foreground hover:text-primary font-medium whitespace-nowrap">
+            {row.original.name}
+          </a>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "email",
+      header: "Email",
+      size: 200,
+      cell: ({ row }) => (
+        <a href={"mailto:" + row.original.email} className="hover:text-primary hover:underline whitespace-nowrap">
+          {row.original.email}
+        </a>
+      ),
+    },
+    {
+      accessorKey: "location",
+      header: "Location",
+      size: 175,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5">
+          <img
+            src={"https://flagcdn.com/" + row.original.flag.toLowerCase() + ".svg"}
+            alt={row.original.flag}
+            className="size-4 rounded-full object-cover"
+          />
+          <span className="text-foreground font-medium whitespace-nowrap">{row.original.location}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "joined",
+      header: "Joined",
+      size: 120,
+      cell: ({ row }) => <span className="font-medium whitespace-nowrap">{row.original.joined}</span>,
+    },
+  ], [])
+
+  const table = useReactTable({
+    columns,
+    data,
+    state: { pagination, sorting },
+    columnResizeMode: "onChange",
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const total = table.getFilteredRowModel().rows.length
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total)
+
   return (
-    <DataTable
-      columns={columns}
-      data={patients}
-      filterColumn="name"
-      filterPlaceholder="Search patients..."
-      autoWidth
-    />
+    <div className="w-full space-y-2.5">
+      <div className="w-fit overflow-x-auto rounded-md border">
+        <Table className="w-auto">
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id} style={{ width: h.getSize() }}>{h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}</TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">{start} - {end} of {total}</p>
+        <Pagination className="w-auto mx-0">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={(e) => { e.preventDefault(); table.previousPage(); }}
+                aria-disabled={!table.getCanPreviousPage()}
+                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+            {Array.from({ length: table.getPageCount() }, (_, i) => (
+              <PaginationItem key={i}>
+                <PaginationLink
+                  isActive={i === table.getState().pagination.pageIndex}
+                  onClick={(e) => { e.preventDefault(); table.setPageIndex(i); }}
+                >
+                  {i + 1}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={(e) => { e.preventDefault(); table.nextPage(); }}
+                aria-disabled={!table.getCanNextPage()}
+                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    </div>
   )
 }`,
       preview: React.createElement(AutoWidthDemo),
@@ -4866,6 +5939,1539 @@ export function StripedTableDemo() {
   )
 }`,
       preview: React.createElement(StripedTableDemo),
+    },
+    {
+      name: "Row Selection",
+      description:
+        "Enable row selection with checkboxes using TanStack Table's built-in selection API. Each row tracks its selected state via rowSelection, with a header checkbox for select-all and per-row checkboxes.",
+      code: `"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import {
+  type ColumnDef,
+  type PaginationState,
+  type RowSelectionState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+
+interface IData {
+  id: string
+  name: string
+  availability: "online" | "away" | "busy" | "offline"
+  avatar: string
+  flag: string
+  email: string
+  location: string
+  joined: string
+}
+
+const availabilityColor: Record<string, string> = {
+  online: "bg-green-500",
+  away: "bg-yellow-500",
+  busy: "bg-orange-500",
+  offline: "bg-gray-400",
+}
+
+export function RowSelectionDemo() {
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  })
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: true },
+  ])
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+
+  const columns = useMemo<ColumnDef<IData>[]>(
+    () => [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        ),
+        enableSorting: false,
+        size: 20,
+      },
+      {
+        accessorKey: "name",
+        id: "name",
+        header: "Name",
+        size: 200,
+        enableSorting: true,
+        cell: ({ row }) => {
+          const availability = row.original.availability
+
+          return (
+            <div className="flex items-center gap-3">
+              <Avatar className="size-8">
+                <AvatarImage src={row.original.avatar} alt={row.original.name} />
+                <AvatarFallback>
+                  {row.original.name.split(" ").map((n) => n[0]).join("")}
+                </AvatarFallback>
+                <AvatarBadge
+                  className={\`size-1.5! p-0 \${availabilityColor[availability] || availabilityColor.offline}\`}
+                />
+              </Avatar>
+              <div className="space-y-px">
+                <div className="text-foreground font-medium">{row.original.name}</div>
+                <div className="text-muted-foreground">{row.original.email}</div>
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: "location",
+        header: "Location",
+        size: 180,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1.5">
+            <img
+              src={\`https://flagcdn.com/\${row.original.flag.toLowerCase()}.svg\`}
+              alt={row.original.flag}
+              className="size-4 rounded-full object-cover"
+            />
+            <div className="text-foreground font-medium">{row.original.location}</div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "joined",
+        header: "Joined",
+        size: 120,
+        cell: (info) => <span className="font-medium">{info.getValue() as string}</span>,
+      },
+    ],
+    []
+  )
+
+  const table = useReactTable({
+    columns,
+    data: demoData,
+    getRowId: (row: IData) => row.id,
+    state: { pagination, sorting, rowSelection },
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const total = table.getFilteredRowModel().rows.length
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total)
+
+  return (
+    <div className="w-full space-y-2.5">
+      <div className="overflow-hidden rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id} style={{ width: h.getSize() }}>
+                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id} data-state={row.getIsSelected() ? "selected" : undefined}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">{start} - {end} of {total}</p>
+        <Pagination className="w-auto mx-0">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={(e) => { e.preventDefault(); table.previousPage() }}
+                aria-disabled={!table.getCanPreviousPage()}
+                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+            {Array.from({ length: table.getPageCount() }, (_, i) => (
+              <PaginationItem key={i}>
+                <PaginationLink
+                  isActive={i === table.getState().pagination.pageIndex}
+                  onClick={(e) => { e.preventDefault(); table.setPageIndex(i) }}
+                >
+                  {i + 1}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={(e) => { e.preventDefault(); table.nextPage() }}
+                aria-disabled={!table.getCanNextPage()}
+                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    </div>
+  )
+}`,
+      preview: React.createElement(RowSelectionDemo),
+    },
+    {
+      name: "Card Container",
+      description:
+        "Wrap a data table inside a Card component with a header, action button, and footer pagination for a self-contained panel layout.",
+      code: `"use client"
+
+import { useMemo, useState } from "react"
+import {
+  type ColumnDef,
+  type PaginationState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardAction,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { DataTableColumnHeader } from "@/components/ui/data-table"
+import { UserPlus } from "lucide-react"
+
+interface IData {
+  id: string
+  name: string
+  avatar: string
+  flag: string
+  email: string
+  location: string
+  joined: string
+}
+
+export function CardContainerDemo() {
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  })
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: true },
+  ])
+
+  const columns = useMemo<ColumnDef<IData>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        id: "name",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="User" />
+        ),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-3">
+            <Avatar className="size-8">
+              <AvatarImage src={row.original.avatar} alt={row.original.name} />
+              <AvatarFallback>
+                {row.original.name.split(" ").map((n) => n[0]).join("")}
+              </AvatarFallback>
+            </Avatar>
+            <div className="space-y-px">
+              <div className="text-foreground font-medium">{row.original.name}</div>
+              <div className="text-muted-foreground">{row.original.email}</div>
+            </div>
+          </div>
+        ),
+        size: 480,
+        enableSorting: true,
+        enableHiding: false,
+      },
+      {
+        accessorKey: "location",
+        id: "location",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Location" />
+        ),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1.5">
+            <img
+              src={\`https://flagcdn.com/\${row.original.flag.toLowerCase()}.svg\`}
+              alt={row.original.flag}
+              className="size-4 rounded-full object-cover"
+            />
+            <div className="text-foreground font-medium">{row.original.location}</div>
+          </div>
+        ),
+        size: 360,
+        enableSorting: true,
+      },
+      {
+        accessorKey: "joined",
+        id: "joined",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Joined" />
+        ),
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.joined}</span>
+        ),
+        size: 200,
+        enableSorting: true,
+      },
+    ],
+    []
+  )
+
+  const table = useReactTable({
+    columns,
+    data: demoData,
+    state: { pagination, sorting },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const total = table.getFilteredRowModel().rows.length
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total)
+
+  return (
+    <Card className="w-full gap-3 py-3.5">
+      <CardHeader className="flex items-center justify-between px-3.5">
+        <CardTitle>Users</CardTitle>
+        <CardAction>
+          <Button size="sm">
+            <UserPlus aria-hidden="true" />
+            Add User
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <div className="w-full border-y">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id} style={{ width: h.getSize() }}>
+                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <CardFooter className="border-none bg-transparent! px-3.5 py-0">
+        <div className="flex w-full items-center justify-between">
+          <p className="text-sm text-muted-foreground">{start} - {end} of {total}</p>
+          <Pagination className="w-auto mx-0">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={(e) => { e.preventDefault(); table.previousPage() }}
+                  aria-disabled={!table.getCanPreviousPage()}
+                  className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+              {Array.from({ length: table.getPageCount() }, (_, i) => (
+                <PaginationItem key={i}>
+                  <PaginationLink
+                    isActive={i === table.getState().pagination.pageIndex}
+                    onClick={(e) => { e.preventDefault(); table.setPageIndex(i) }}
+                  >
+                    {i + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={(e) => { e.preventDefault(); table.nextPage() }}
+                  aria-disabled={!table.getCanNextPage()}
+                  className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      </CardFooter>
+    </Card>
+  )
+}`,
+      preview: React.createElement(CardContainerDemo),
+    },
+    {
+      name: "Column Visibility",
+      description:
+        "Toggle column visibility from a dropdown in the card header. The User column is always visible (enableHiding: false). Click the Columns button to show or hide Location, Joined, and Status columns.",
+      code: `"use client"
+
+import { useState, useMemo } from "react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardAction, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataTableColumnHeader } from "@/components/ui/data-table"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  type ColumnDef,
+  type PaginationState,
+  type SortingState,
+  type VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import { Settings2 } from "lucide-react"
+
+interface Member {
+  id: string
+  name: string
+  avatar: string
+  flag: string
+  email: string
+  location: string
+  joined: string
+  status: "active" | "inactive"
+}
+
+const members: Member[] = [
+  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "us", email: "alex@apple.com",      location: "United States",  joined: "Apr, 2021", status: "active"   },
+  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "gb", email: "sarah@openai.com",    location: "United Kingdom", joined: "Jul, 2020", status: "inactive" },
+  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", flag: "ca", email: "michael@meta.com",    location: "Canada",         joined: "Mar, 2019", status: "active"   },
+  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", flag: "au", email: "emma@tesla.com",      location: "Australia",      joined: "Jan, 2022", status: "inactive" },
+  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", flag: "de", email: "david@sap.com",       location: "Germany",        joined: "May, 2023", status: "active"   },
+  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", flag: "my", email: "aron@keenthemes.com", location: "Malaysia",       joined: "Nov, 2018", status: "active"   },
+  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", flag: "es", email: "james@bbva.es",       location: "Spain",          joined: "Jun, 2021", status: "inactive" },
+  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", flag: "jp", email: "maria@sony.jp",       location: "Japan",          joined: "Oct, 2020", status: "active"   },
+  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", flag: "fr", email: "nick@lvmh.fr",        location: "France",         joined: "Sep, 2019", status: "active"   },
+  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", flag: "it", email: "liam@eni.it",         location: "Italy",          joined: "Feb, 2023", status: "inactive" },
+  { id: "11", name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", flag: "br", email: "alex@vale.br",        location: "Brazil",         joined: "Dec, 2022", status: "active"   },
+  { id: "12", name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", flag: "in", email: "sarah@tata.in",       location: "India",          joined: "Mar, 2020", status: "active"   },
+]
+
+export function ColumnVisibilityTable() {
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  })
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: true },
+  ])
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+
+  const columns = useMemo<ColumnDef<Member>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        id: "name",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="User" />
+        ),
+        size: 200,
+        enableSorting: true,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-3">
+            <Avatar className="size-8">
+              <AvatarImage src={row.original.avatar} alt={row.original.name} />
+              <AvatarFallback>
+                {row.original.name.split(" ").map((n) => n[0]).join("")}
+              </AvatarFallback>
+            </Avatar>
+            <div className="space-y-px">
+              <div className="text-foreground font-medium">{row.original.name}</div>
+              <div className="text-muted-foreground">{row.original.email}</div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "location",
+        id: "location",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Location" />
+        ),
+        size: 160,
+        enableSorting: true,
+        enableHiding: true,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1.5">
+            <img
+              src={\`https://flagcdn.com/\${row.original.flag.toLowerCase()}.svg\`}
+              alt={row.original.flag}
+              className="size-4 rounded-full object-cover"
+            />
+            <div className="text-foreground font-medium">{row.original.location}</div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "joined",
+        id: "joined",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Joined" />
+        ),
+        size: 120,
+        enableSorting: true,
+        enableHiding: true,
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.joined}</span>
+        ),
+      },
+      {
+        accessorKey: "status",
+        id: "status",
+        header: "Status",
+        size: 100,
+        enableSorting: true,
+        enableHiding: true,
+        cell: ({ row }) =>
+          row.original.status === "active"
+            ? <Badge variant="success">Approved</Badge>
+            : <Badge variant="warning">Pending</Badge>,
+      },
+    ],
+    []
+  )
+
+  const table = useReactTable({
+    columns,
+    data: members,
+    getRowId: (row) => row.id,
+    state: { pagination, sorting, columnVisibility },
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const total = table.getFilteredRowModel().rows.length
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total)
+
+  return (
+    <Card className="w-full gap-3 py-3.5">
+      <CardHeader className="flex items-center justify-between px-3.5">
+        <CardTitle>Users</CardTitle>
+        <CardAction>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Settings2 aria-hidden />
+                Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  >
+                    {column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </CardAction>
+      </CardHeader>
+      <div className="w-full border-y">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id} style={{ width: h.getSize() }}>
+                    {h.isPlaceholder
+                      ? null
+                      : flexRender(h.column.columnDef.header, h.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <CardFooter className="border-none bg-transparent! px-3.5 py-0">
+        <div className="flex w-full items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {\`\${start} - \${end} of \${total}\`}
+          </p>
+          <Pagination className="w-auto mx-0">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={(e) => { e.preventDefault(); table.previousPage() }}
+                  aria-disabled={!table.getCanPreviousPage()}
+                  className={
+                    !table.getCanPreviousPage()
+                      ? "pointer-events-none opacity-50"
+                      : undefined
+                  }
+                />
+              </PaginationItem>
+              {Array.from({ length: table.getPageCount() }, (_, i) => (
+                <PaginationItem key={i}>
+                  <PaginationLink
+                    isActive={i === table.getState().pagination.pageIndex}
+                    onClick={(e) => { e.preventDefault(); table.setPageIndex(i) }}
+                  >
+                    {i + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={(e) => { e.preventDefault(); table.nextPage() }}
+                  aria-disabled={!table.getCanNextPage()}
+                  className={
+                    !table.getCanNextPage()
+                      ? "pointer-events-none opacity-50"
+                      : undefined
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      </CardFooter>
+    </Card>
+  )
+}`,
+      preview: React.createElement(ColumnVisibilityDemo),
+    },
+    {
+      name: "Loading Skeleton",
+      description:
+        "Shows animated skeleton placeholders while data is loading. Each column defines its own skeleton shape via column meta. Click the toggle button to switch between loading and loaded states.",
+      code: `"use client"
+
+import { useState, useMemo } from "react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardAction, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { DataTableColumnHeader } from "@/components/ui/data-table"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  type ColumnDef,
+  type PaginationState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+
+interface Member {
+  id: string
+  name: string
+  avatar: string
+  email: string
+  status: "active" | "inactive"
+}
+
+const members: Member[] = [
+  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", email: "alex@apple.com",      status: "active"   },
+  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", email: "sarah@openai.com",    status: "inactive" },
+  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", email: "michael@meta.com",    status: "active"   },
+  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", email: "emma@tesla.com",      status: "inactive" },
+  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", email: "david@sap.com",       status: "active"   },
+  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", email: "aron@keenthemes.com", status: "active"   },
+  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", email: "james@bbva.es",       status: "inactive" },
+  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", email: "maria@sony.jp",       status: "active"   },
+  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", email: "nick@lvmh.fr",        status: "active"   },
+  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", email: "liam@eni.it",         status: "inactive" },
+  { id: "11", name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", email: "alex@vale.br",        status: "active"   },
+  { id: "12", name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", email: "sarah@tata.in",       status: "active"   },
+]
+
+export function LoadingSkeletonTable() {
+  const [isLoading, setIsLoading] = useState(true)
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  })
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: true },
+  ])
+
+  const columns = useMemo<ColumnDef<Member>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        id: "name",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="User" />
+        ),
+        size: 200,
+        enableSorting: true,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-3">
+            <Avatar className="size-8">
+              <AvatarImage src={row.original.avatar} alt={row.original.name} />
+              <AvatarFallback>
+                {row.original.name.split(" ").map((n) => n[0]).join("")}
+              </AvatarFallback>
+            </Avatar>
+            <div className="space-y-px">
+              <div className="text-foreground font-medium">{row.original.name}</div>
+              <div className="text-muted-foreground">{row.original.email}</div>
+            </div>
+          </div>
+        ),
+        meta: {
+          skeleton: (
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-8 rounded-full" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3.5 w-16" />
+              </div>
+            </div>
+          ),
+        },
+      },
+      {
+        accessorKey: "email",
+        id: "email",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Email" />
+        ),
+        size: 150,
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{row.original.email}</span>
+        ),
+        meta: {
+          skeleton: <Skeleton className="h-4 w-28" />,
+        },
+      },
+      {
+        accessorKey: "status",
+        id: "status",
+        header: "Status",
+        size: 100,
+        cell: ({ row }) =>
+          row.original.status === "active"
+            ? <Badge variant="success">Approved</Badge>
+            : <Badge variant="warning">Pending</Badge>,
+        meta: {
+          skeleton: <Skeleton className="h-5 w-16 rounded-full" />,
+        },
+      },
+    ],
+    []
+  )
+
+  const table = useReactTable({
+    columns,
+    data: members,
+    getRowId: (row) => row.id,
+    state: { pagination, sorting },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const total = table.getFilteredRowModel().rows.length
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+  const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total)
+  const skeletonRows = Array.from({ length: pagination.pageSize })
+
+  return (
+    <Card className="w-full gap-3 py-3.5">
+      <CardHeader className="flex items-center justify-between px-3.5">
+        <CardTitle>Employees</CardTitle>
+        <CardAction>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsLoading((p) => !p)}
+          >
+            {isLoading ? "Disable Loading" : "Enable Loading"}
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <div className="w-full border-y">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((h) => (
+                  <TableHead key={h.id} style={{ width: h.getSize() }}>
+                    {h.isPlaceholder
+                      ? null
+                      : flexRender(h.column.columnDef.header, h.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {isLoading
+              ? skeletonRows.map((_, i) => (
+                  <TableRow key={\`skeleton-\${i}\`}>
+                    {table.getAllLeafColumns().map((col) => (
+                      <TableCell key={col.id} style={{ width: col.getSize() }}>
+                        {(col.columnDef.meta as any)?.skeleton ?? (
+                          <Skeleton className="h-4 w-full" />
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        style={{ width: cell.column.getSize() }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+          </TableBody>
+        </Table>
+      </div>
+      <CardFooter className="border-none bg-transparent! px-3.5 py-0">
+        <div className="flex w-full items-center justify-between">
+          {isLoading ? (
+            <>
+              <Skeleton className="h-4 w-32" />
+              <div className="flex gap-1">
+                <Skeleton className="size-8 rounded-md" />
+                <Skeleton className="size-8 rounded-md" />
+                <Skeleton className="size-8 rounded-md" />
+                <Skeleton className="size-8 rounded-md" />
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {\`\${start} - \${end} of \${total}\`}
+              </p>
+              <Pagination className="w-auto mx-0">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={(e) => {
+                        e.preventDefault()
+                        table.previousPage()
+                      }}
+                      aria-disabled={!table.getCanPreviousPage()}
+                      className={
+                        !table.getCanPreviousPage()
+                          ? "pointer-events-none opacity-50"
+                          : undefined
+                      }
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: table.getPageCount() }, (_, i) => (
+                    <PaginationItem key={i}>
+                      <PaginationLink
+                        isActive={
+                          i === table.getState().pagination.pageIndex
+                        }
+                        onClick={(e) => {
+                          e.preventDefault()
+                          table.setPageIndex(i)
+                        }}
+                      >
+                        {i + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={(e) => {
+                        e.preventDefault()
+                        table.nextPage()
+                      }}
+                      aria-disabled={!table.getCanNextPage()}
+                      className={
+                        !table.getCanNextPage()
+                          ? "pointer-events-none opacity-50"
+                          : undefined
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </>
+          )}
+        </div>
+      </CardFooter>
+    </Card>
+  )
+}`,
+      preview: React.createElement(LoadingSkeletonDemo),
+    },
+    {
+      name: "CRUD Table",
+      description:
+        "Full-featured CRUD table with search, status filter popover, row selection, sortable columns, row actions dropdown (edit, copy ID, delete), and pagination. Demonstrates a real-world data management pattern.",
+      code: `"use client"
+
+import { useMemo, useState } from "react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { DataTableColumnHeader } from "@/components/ui/data-table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group"
+import { Label } from "@/components/ui/label"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  type ColumnDef,
+  type PaginationState,
+  type Row,
+  type RowSelectionState,
+  type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import {
+  Filter,
+  MoreHorizontal,
+  Search,
+  UserPlus,
+  X,
+} from "lucide-react"
+import { toast } from "sonner"
+
+interface Member {
+  id: string
+  name: string
+  avatar: string
+  status: "Active" | "Inactive" | "Pending" | "Blocked"
+  flag: string
+  email: string
+  role: string
+  joined: string
+  location: string
+}
+
+const data: Member[] = [
+  { id: "1",  name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "Active",   flag: "us", email: "alex@apple.com",      role: "CEO",              joined: "Jan, 2024", location: "United States" },
+  { id: "2",  name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "Inactive", flag: "gb", email: "sarah@openai.com",    role: "CTO",              joined: "Mar, 2023", location: "United Kingdom" },
+  { id: "3",  name: "Michael Rodriguez", avatar: "https://images.unsplash.com/photo-1584308972272-9e4e7685e80f?w=96&h=96&dpr=2&q=80", status: "Blocked",  flag: "ca", email: "michael@meta.com",    role: "Designer",         joined: "Jun, 2022", location: "Canada" },
+  { id: "4",  name: "Emma Wilson",       avatar: "https://images.unsplash.com/photo-1485893086445-ed75865251e0?w=96&h=96&dpr=2&q=80", status: "Inactive", flag: "au", email: "emma@tesla.com",      role: "Developer",        joined: "Sep, 2024", location: "Australia" },
+  { id: "5",  name: "David Kim",         avatar: "https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?w=96&h=96&dpr=2&q=80", status: "Active",   flag: "de", email: "david@sap.com",       role: "Lawyer",           joined: "Nov, 2023", location: "Germany" },
+  { id: "6",  name: "Aron Thompson",     avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=96&h=96&dpr=2&q=80", status: "Pending",  flag: "my", email: "aron@keenthemes.com", role: "Director",         joined: "Feb, 2022", location: "Malaysia" },
+  { id: "7",  name: "James Brown",       avatar: "https://images.unsplash.com/photo-1543299750-19d1d6297053?w=96&h=96&dpr=2&q=80", status: "Inactive", flag: "es", email: "james@bbva.es",       role: "Product Manager",  joined: "Aug, 2024", location: "Spain" },
+  { id: "8",  name: "Maria Garcia",      avatar: "https://images.unsplash.com/photo-1620075225255-8c2051b6c015?w=96&h=96&dpr=2&q=80", status: "Blocked",  flag: "jp", email: "maria@sony.jp",       role: "Marketing Lead",   joined: "Dec, 2023", location: "Japan" },
+  { id: "9",  name: "Nick Johnson",      avatar: "https://images.unsplash.com/photo-1485206412256-701ccc5b93ca?w=96&h=96&dpr=2&q=80", status: "Pending",  flag: "fr", email: "nick@lvmh.fr",        role: "Data Scientist",   joined: "Apr, 2022", location: "France" },
+  { id: "10", name: "Liam Thompson",     avatar: "https://images.unsplash.com/photo-1542595913-85d69b0edbaf?w=96&h=96&dpr=2&q=80", status: "Inactive", flag: "it", email: "liam@eni.it",         role: "Engineer",         joined: "Jul, 2024", location: "Italy" },
+  { id: "11", name: "Alex Johnson",      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&dpr=2&q=80", status: "Blocked",  flag: "br", email: "alex@vale.br",        role: "Software Engineer",joined: "May, 2023", location: "Brazil" },
+  { id: "12", name: "Sarah Chen",        avatar: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=96&h=96&dpr=2&q=80", status: "Active",   flag: "in", email: "sarah@tata.in",       role: "Sales Manager",    joined: "Oct, 2024", location: "India" },
+]
+
+function ActionsCell({ row }: { row: Row<Member> }) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button className="size-7" size="icon" variant="ghost">
+          <MoreHorizontal />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="bottom" align="start">
+        <DropdownMenuItem onClick={() => {}}>Edit</DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            navigator.clipboard.writeText(row.original.id)
+            toast.success("Employee ID copied", {
+              description: row.original.id,
+            })
+          }}
+        >
+          Copy ID
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onClick={() => {}}>
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+export function CrudTable() {
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 5,
+  })
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: true },
+  ])
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      const matchesStatus =
+        !selectedStatuses.length || selectedStatuses.includes(item.status)
+      const searchLower = searchQuery.toLowerCase()
+      const matchesSearch =
+        !searchQuery ||
+        Object.values(item).join(" ").toLowerCase().includes(searchLower)
+      return matchesStatus && matchesSearch
+    })
+  }, [searchQuery, selectedStatuses])
+
+  const statusCounts = useMemo(() => {
+    return data.reduce(
+      (acc, item) => {
+        acc[item.status] = (acc[item.status] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
+  }, [])
+
+  const handleStatusChange = (checked: boolean, value: string) => {
+    setSelectedStatuses((prev) =>
+      checked ? [...prev, value] : prev.filter((v) => v !== value)
+    )
+  }
+
+  const columns = useMemo<ColumnDef<Member>[]>(
+    () => [
+      {
+        accessorKey: "id",
+        id: "id",
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        ),
+        enableSorting: false,
+        size: 35,
+      },
+      {
+        accessorKey: "name",
+        id: "name",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="User" />
+        ),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-3">
+            <Avatar className="size-8">
+              <AvatarImage
+                src={row.original.avatar}
+                alt={row.original.name}
+              />
+              <AvatarFallback>
+                {row.original.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
+              </AvatarFallback>
+            </Avatar>
+            <div className="space-y-px">
+              <div className="text-foreground font-medium">
+                {row.original.name}
+              </div>
+              <div className="text-muted-foreground">
+                {row.original.email}
+              </div>
+            </div>
+          </div>
+        ),
+        size: 200,
+        enableSorting: true,
+      },
+      {
+        accessorKey: "location",
+        id: "location",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Location" />
+        ),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1.5">
+            <img
+              src={\`https://flagcdn.com/\${row.original.flag.toLowerCase()}.svg\`}
+              alt={row.original.flag}
+              className="size-4 rounded-full object-cover"
+            />
+            <div className="text-foreground font-medium">
+              {row.original.location}
+            </div>
+          </div>
+        ),
+        size: 150,
+        enableSorting: true,
+      },
+      {
+        accessorKey: "role",
+        id: "role",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Role" />
+        ),
+        cell: ({ row }) => (
+          <div className="text-foreground font-medium">
+            {row.original.role}
+          </div>
+        ),
+        size: 150,
+        enableSorting: true,
+      },
+      {
+        accessorKey: "joined",
+        id: "joined",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Joined" />
+        ),
+        cell: ({ row }) => (
+          <div className="text-foreground font-medium">
+            {row.original.joined}
+          </div>
+        ),
+        size: 150,
+        enableSorting: true,
+      },
+      {
+        accessorKey: "status",
+        id: "status",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Status" />
+        ),
+        cell: ({ row }) => {
+          const status = row.original.status
+          if (status === "Active")
+            return <Badge variant="success">Approved</Badge>
+          if (status === "Blocked")
+            return <Badge variant="destructive">Blocked</Badge>
+          if (status === "Inactive")
+            return <Badge variant="info">Inactive</Badge>
+          return <Badge variant="warning">Pending</Badge>
+        },
+        size: 100,
+        enableSorting: true,
+      },
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => <ActionsCell row={row} />,
+        size: 60,
+        enableSorting: false,
+      },
+    ],
+    []
+  )
+
+  const table = useReactTable({
+    columns,
+    data: filteredData,
+    getRowId: (row) => row.id,
+    state: { pagination, sorting, rowSelection },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  const total = table.getFilteredRowModel().rows.length
+  const start = total === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+  const end = Math.min(
+    (pagination.pageIndex + 1) * pagination.pageSize,
+    total
+  )
+
+  return (
+    <Card className="w-full gap-3 py-0">
+      <CardHeader className="flex items-center justify-between px-3.5 py-2">
+        <div className="flex items-center gap-2.5">
+          <InputGroup className="w-48">
+            <InputGroupAddon align="inline-start">
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery.length > 0 && (
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  aria-label="Clear"
+                  size="icon-xs"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X />
+                </InputGroupButton>
+              </InputGroupAddon>
+            )}
+          </InputGroup>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline">
+                <Filter />
+                Status
+                {selectedStatuses.length > 0 && (
+                  <Badge size="sm" variant="info">
+                    {selectedStatuses.length}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-40" align="start">
+              <div className="space-y-3">
+                <div className="text-muted-foreground text-xs font-medium">
+                  Filters
+                </div>
+                <div className="space-y-3">
+                  {Object.keys(statusCounts).map((status) => (
+                    <div
+                      key={status}
+                      className="flex items-center gap-2.5"
+                    >
+                      <Checkbox
+                        id={status}
+                        checked={selectedStatuses.includes(status)}
+                        onCheckedChange={(checked) =>
+                          handleStatusChange(checked === true, status)
+                        }
+                      />
+                      <Label
+                        htmlFor={status}
+                        className="flex grow items-center justify-between gap-1.5 font-normal"
+                      >
+                        {status}
+                        <span className="text-muted-foreground">
+                          {statusCounts[status]}
+                        </span>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+        <CardAction>
+          <Button>
+            <UserPlus />
+            Add new
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="border-y px-0">
+        <ScrollArea orientation="horizontal">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id}>
+                  {hg.headers.map((h) => (
+                    <TableHead key={h.id} style={{ width: h.getSize() }}>
+                      {h.isPlaceholder
+                        ? null
+                        : flexRender(
+                            h.column.columnDef.header,
+                            h.getContext()
+                          )}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() ? "selected" : undefined}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      style={{ width: cell.column.getSize() }}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      </CardContent>
+      <CardFooter className="border-none bg-transparent! px-3.5 py-2">
+        <div className="flex w-full items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {\`\${start} - \${end} of \${total}\`}
+          </p>
+          <Pagination className="w-auto mx-0">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={(e) => {
+                    e.preventDefault()
+                    table.previousPage()
+                  }}
+                  aria-disabled={!table.getCanPreviousPage()}
+                  className={
+                    !table.getCanPreviousPage()
+                      ? "pointer-events-none opacity-50"
+                      : undefined
+                  }
+                />
+              </PaginationItem>
+              {Array.from({ length: table.getPageCount() }, (_, i) => (
+                <PaginationItem key={i}>
+                  <PaginationLink
+                    isActive={
+                      i === table.getState().pagination.pageIndex
+                    }
+                    onClick={(e) => {
+                      e.preventDefault()
+                      table.setPageIndex(i)
+                    }}
+                  >
+                    {i + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={(e) => {
+                    e.preventDefault()
+                    table.nextPage()
+                  }}
+                  aria-disabled={!table.getCanNextPage()}
+                  className={
+                    !table.getCanNextPage()
+                      ? "pointer-events-none opacity-50"
+                      : undefined
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      </CardFooter>
+    </Card>
+  )
+}`,
+      preview: React.createElement(CrudDemo),
     },
   ],
   props: [

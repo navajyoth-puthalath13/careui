@@ -8,8 +8,10 @@
 
 import * as React from "react";
 import {
+  type Column,
   type ColumnDef,
   type ColumnFiltersState,
+  type ColumnPinningState,
   type ExpandedState,
   type Row,
   type RowData,
@@ -60,6 +62,7 @@ declare module "@tanstack/react-table" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData extends RowData, TValue> {
     className?: string;
+    skeleton?: React.ReactNode;
   }
 }
 
@@ -98,6 +101,10 @@ interface DataTableProps<TData, TValue> {
   hideToolbar?: boolean;
   /** Allow columns to be reordered by dragging their headers. */
   movableColumns?: boolean;
+  /** Enable column pinning via the header dropdown. Renders a horizontally scrollable table with sticky pinned columns. */
+  pinnable?: boolean;
+  /** Initial column pinning state when pinnable is true. */
+  initialPinning?: ColumnPinningState;
   className?: string;
 }
 
@@ -112,6 +119,8 @@ function DataTable<TData, TValue>({
   renderExpandedRow,
   hideToolbar = false,
   movableColumns = false,
+  pinnable = false,
+  initialPinning,
   className,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -166,6 +175,9 @@ function DataTable<TData, TValue>({
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     ...(movableColumns && { onColumnOrderChange: setColumnOrder }),
+    ...(pinnable && initialPinning && {
+      initialState: { columnPinning: initialPinning },
+    }),
     state: {
       sorting,
       columnFilters,
@@ -185,7 +197,29 @@ function DataTable<TData, TValue>({
     [movableColumns, moveColumn, columnOrder]
   );
 
-  return (
+  const pinCellStyle = (col: Column<TData, unknown>) => {
+    if (!pinnable) return undefined;
+    const pinned = col.getIsPinned();
+    if (!pinned) return undefined;
+    return {
+      width: col.getSize(),
+      minWidth: col.getSize(),
+      maxWidth: col.getSize(),
+      position: "sticky" as const,
+      left: pinned === "left" ? col.getStart("left") : undefined,
+      right: pinned === "right" ? col.getAfter("right") : undefined,
+      zIndex: 1,
+      boxShadow: pinned === "left"
+        ? "inset -1px 0 0 0 var(--border)"
+        : "inset 1px 0 0 0 var(--border)",
+    };
+  };
+
+  const pinTableMinWidth = pinnable
+    ? table.getAllLeafColumns().reduce((sum, col) => sum + col.getSize(), 0)
+    : undefined;
+
+  const tableContent = (
     <DataTableMoveContext.Provider value={moveCtxValue}>
     <div data-slot="data-table" className={cn("w-full", className)}>
       {/* Toolbar */}
@@ -236,22 +270,27 @@ function DataTable<TData, TValue>({
 
       {/* Table */}
       <div className={cn(
-        "overflow-hidden rounded-md border",
-        "[&_th:first-child:not(:has([data-slot=checkbox]))_[data-slot=button]]:-ms-1",
-        "[&_th:not(:first-child)_[data-slot=button]]:-ms-3",
+        "rounded-md border",
+        pinnable ? "overflow-x-auto" : "overflow-hidden",
+        "[&_th:first-child:not(:has([data-slot=checkbox])):is(:has([data-slot=button]),:has([data-slot=dropdown-menu-trigger]))_:is([data-slot=button],[data-slot=dropdown-menu-trigger])]:-ms-1",
+        "[&_th:not(:first-child):is(:has([data-slot=button]),:has([data-slot=dropdown-menu-trigger]))_:is([data-slot=button],[data-slot=dropdown-menu-trigger])]:-ms-3",
         cellBorder && "[&_td:not(:last-child)]:border-r [&_th:not(:last-child)]:border-r",
+        pinnable && !cellBorder && "[&_td:not(:last-child):not([data-pinned])]:border-r [&_th:not(:last-child):not([data-pinned])]:border-r",
         dense && "[&_td]:py-1.5 [&_th]:h-8 [&_th]:py-0",
-        autoWidth && "w-fit [&_table]:w-auto"
+        autoWidth && "w-fit [&_table]:w-auto",
       )}>
-        <Table>
+        <Table style={pinTableMinWidth ? { minWidth: pinTableMinWidth } : undefined}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
+                    style={pinCellStyle(header.column)}
+                    data-pinned={pinnable && header.column.getIsPinned() ? header.column.getIsPinned() : undefined}
                     className={cn(
                       header.column.columnDef.meta?.className,
+                      pinnable && header.column.getIsPinned() && "bg-soft-background",
                     )}
                   >
                     {header.isPlaceholder
@@ -275,7 +314,12 @@ function DataTable<TData, TValue>({
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
-                        className={cn(cell.column.columnDef.meta?.className)}
+                        style={pinCellStyle(cell.column)}
+                        data-pinned={pinnable && cell.column.getIsPinned() ? cell.column.getIsPinned() : undefined}
+                        className={cn(
+                          cell.column.columnDef.meta?.className,
+                          pinnable && cell.column.getIsPinned() && "bg-background",
+                        )}
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
@@ -374,6 +418,10 @@ function DataTable<TData, TValue>({
     </div>
     </DataTableMoveContext.Provider>
   );
+
+  return pinnable
+    ? <DataTablePinContext.Provider value={true}>{tableContent}</DataTablePinContext.Provider>
+    : tableContent;
 }
 
 // ─── DataTableColumnHeader ────────────────────────────────────────────────────
