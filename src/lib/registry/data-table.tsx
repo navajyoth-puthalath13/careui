@@ -45,6 +45,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // ─── Patient data ─────────────────────────────────────────────────────────────
 
@@ -982,7 +983,7 @@ function PinnableColumnsDemo() {
                           left: isPinned === "left" ? header.column.getStart("left") : undefined,
                           right: isPinned === "right" ? header.column.getAfter("right") : undefined,
                           zIndex: 1,
-                          boxShadow: isPinned === "left" ? "inset -1px 0 0 0 var(--border)" : "inset 1px 0 0 0 var(--border)",
+                          boxShadow: isPinned === "left" ? "inset -0.5px 0 0 0 var(--border)" : "inset 0.5px 0 0 0 var(--border)",
                         } : undefined}
                         className={isPinned ? "bg-background" : ""}
                       >
@@ -1006,7 +1007,7 @@ function PinnableColumnsDemo() {
                           left: isPinned === "left" ? cell.column.getStart("left") : undefined,
                           right: isPinned === "right" ? cell.column.getAfter("right") : undefined,
                           zIndex: 1,
-                          boxShadow: isPinned === "left" ? "inset -1px 0 0 0 var(--border)" : "inset 1px 0 0 0 var(--border)",
+                          boxShadow: isPinned === "left" ? "inset -0.5px 0 0 0 var(--border)" : "inset 0.5px 0 0 0 var(--border)",
                         } : undefined}
                         className={isPinned ? "bg-background" : ""}
                       >
@@ -1776,6 +1777,99 @@ function RowPinningDemo() {
                   "No results."
                 )
               )
+        )
+      )
+    )
+  );
+}
+
+// ─── Sticky header demo ─────────────────────────────────────────────────────────
+
+const stickyHeaderColumns: ColumnDef<Patient>[] = [
+  {
+    id: "patient",
+    accessorKey: "name",
+    enableSorting: true,
+    header: ({ column }) =>
+      React.createElement(DataTableColumnHeader, { column: column as any, title: "Patient" }),
+    cell: ({ row }) => patientCell(row.original.name, row.original.id),
+  },
+  {
+    id: "location",
+    header: "Ward / Bed",
+    cell: ({ row }) =>
+      React.createElement(
+        "div",
+        { className: "flex flex-col" },
+        React.createElement("span", { className: "font-medium text-sm" }, row.original.ward),
+        React.createElement("span", { className: "text-muted-foreground text-xs" }, row.original.bed)
+      ),
+  },
+  { accessorKey: "diagnosis", header: "Diagnosis" },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) =>
+      React.createElement(
+        Badge,
+        { variant: patientStatusVariant[row.getValue("status") as Patient["status"]] },
+        row.getValue("status")
+      ),
+  },
+];
+
+function StickyHeaderDemo() {
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+
+  const table = useReactTable({
+    data: patients,
+    columns: stickyHeaderColumns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  return React.createElement(
+    ScrollArea,
+    { className: "h-80 rounded-md border" },
+    React.createElement(
+      "table",
+      { className: "w-full caption-bottom text-sm" },
+      React.createElement(
+        TableHeader,
+        { className: "sticky top-0 z-10 bg-soft-background shadow-[0_0.5px_0_0_var(--border)]" },
+        table.getHeaderGroups().map((hg) =>
+          React.createElement(
+            TableRow,
+            { key: hg.id, className: "border-b-0" },
+            hg.headers.map((header) =>
+              React.createElement(
+                TableHead,
+                { key: header.id },
+                header.isPlaceholder
+                  ? null
+                  : flexRender(header.column.columnDef.header, header.getContext())
+              )
+            )
+          )
+        )
+      ),
+      React.createElement(
+        TableBody,
+        null,
+        table.getRowModel().rows.map((row) =>
+          React.createElement(
+            TableRow,
+            { key: row.id },
+            row.getVisibleCells().map((cell) =>
+              React.createElement(
+                TableCell,
+                { key: cell.id },
+                flexRender(cell.column.columnDef.cell, cell.getContext())
+              )
+            )
+          )
         )
       )
     )
@@ -2909,7 +3003,7 @@ export function PinnableColumnsTable() {
                           left: isPinned === "left" ? header.column.getStart("left") : undefined,
                           right: isPinned === "right" ? header.column.getAfter("right") : undefined,
                           zIndex: 1,
-                          boxShadow: isPinned === "left" ? "inset -1px 0 0 0 var(--border)" : "inset 1px 0 0 0 var(--border)",
+                          boxShadow: isPinned === "left" ? "inset -0.5px 0 0 0 var(--border)" : "inset 0.5px 0 0 0 var(--border)",
                         } : undefined}
                         className={isPinned ? "bg-background" : ""}
                       >
@@ -2933,7 +3027,7 @@ export function PinnableColumnsTable() {
                           left: isPinned === "left" ? cell.column.getStart("left") : undefined,
                           right: isPinned === "right" ? cell.column.getAfter("right") : undefined,
                           zIndex: 1,
-                          boxShadow: isPinned === "left" ? "inset -1px 0 0 0 var(--border)" : "inset 1px 0 0 0 var(--border)",
+                          boxShadow: isPinned === "left" ? "inset -0.5px 0 0 0 var(--border)" : "inset 0.5px 0 0 0 var(--border)",
                         } : undefined}
                         className={isPinned ? "bg-background" : ""}
                       >
@@ -3866,6 +3960,137 @@ export function RowPinningTable() {
   )
 }`,
       preview: React.createElement(RowPinningDemo),
+    },
+    {
+      name: "Sticky Header",
+      description:
+        "Place a raw `<table>` directly inside a single `overflow-auto` container — this div is both the scroll ancestor and the visual border. `sticky top-0` on `TableHeader` works because there is no intermediate `overflow` element between it and the scrolling container. Control the visible height by adding a `max-h-*` class to the container from wherever it is consumed.",
+      code: `"use client"
+
+import { useState } from "react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { DataTableColumnHeader } from "@/components/ui/data-table"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  type ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  type SortingState,
+  useReactTable,
+} from "@tanstack/react-table"
+
+type Patient = {
+  id: string
+  name: string
+  ward: string
+  bed: string
+  diagnosis: string
+  status: "admitted" | "critical" | "stable" | "discharged"
+}
+
+const patientStatusVariant = {
+  stable:     "success",
+  admitted:   "info",
+  critical:   "destructive",
+  discharged: "neutral",
+} as const
+
+const getInitials = (name: string) =>
+  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+
+const columns: ColumnDef<Patient>[] = [
+  {
+    id: "patient",
+    accessorKey: "name",
+    enableSorting: true,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Patient" />,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <Avatar shape="rounded">
+          <AvatarFallback>{getInitials(row.original.name)}</AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col">
+          <span className="font-medium">{row.original.name}</span>
+          <span className="text-muted-foreground text-xs">{row.original.id}</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "location",
+    header: "Ward / Bed",
+    cell: ({ row }) => (
+      <div className="flex flex-col">
+        <span className="font-medium text-sm">{row.original.ward}</span>
+        <span className="text-muted-foreground text-xs">{row.original.bed}</span>
+      </div>
+    ),
+  },
+  { accessorKey: "diagnosis", header: "Diagnosis" },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => (
+      <Badge variant={patientStatusVariant[row.getValue("status") as Patient["status"]]}>
+        {row.getValue("status")}
+      </Badge>
+    ),
+  },
+]
+
+export function StickyHeaderTable() {
+  const [sorting, setSorting] = useState<SortingState>([])
+
+  const table = useReactTable({
+    data: patients,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+
+  return (
+    <ScrollArea className="h-80 rounded-md border">
+      <table className="w-full caption-bottom text-sm">
+        <TableHeader className="sticky top-0 z-10 bg-background shadow-[0_1px_0_0_var(--border)]">
+          {table.getHeaderGroups().map((hg) => (
+            <TableRow key={hg.id} className="border-b-0">
+              {hg.headers.map((header) => (
+                <TableHead key={header.id}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </table>
+    </ScrollArea>
+  )
+}`,
+      preview: React.createElement(StickyHeaderDemo),
     },
   ],
   props: [
