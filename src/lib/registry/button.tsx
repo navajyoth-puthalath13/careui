@@ -1,92 +1,128 @@
 import React from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { RadialSpinner } from "@/components/ui/spinner";
-import { Spinner } from "@/components/ui/spinner";
+import { RadialSpinner, Spinner } from "@/components/ui/spinner";
 import { type ComponentDoc } from "@/lib/types";
 import { CheckIcon, ChevronRight, Mail, Plus, RefreshCwIcon, SaveIcon, Trash2, X } from "lucide-react";
 
-type SaveState = "idle" | "saving" | "saved" | "error"
+type AsyncButtonState = "idle" | "loading" | "success" | "error"
 
 const BTN_SPRING = { type: "spring" as const, duration: 0.3, bounce: 0 }
 const BTN_FADE_UP   = { initial: { opacity: 0, y:  6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0 }, transition: { ...BTN_SPRING, exit: { duration: 0 } } }
 const BTN_FADE_DOWN = { initial: { opacity: 0, y: -6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y:  6 }, transition: BTN_SPRING }
 const BTN_SNAP_IN   = { initial: { opacity: 1, y:  0 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -6 }, transition: BTN_SPRING }
 
-function SaveButtonDemo({ outcome }: { outcome: "saved" | "error" }) {
-  const [state, setState] = React.useState<SaveState>("idle")
+type AsyncButtonProps = Omit<React.ComponentProps<typeof Button>, "onClick"> & {
+  onClick: () => Promise<void>
+  idleContent: React.ReactNode
+  successContent?: React.ReactNode
+  errorContent?: React.ReactNode
+  disableOnSuccess?: boolean
+}
 
-  function handleClick() {
-    if (state === "saving") return
-    setState("saving")
-    setTimeout(() => setState(outcome), 1500)
+function AsyncButton({
+  onClick,
+  idleContent,
+  successContent,
+  errorContent,
+  disableOnSuccess = true,
+  variant: variantProp = "default",
+  ...props
+}: AsyncButtonProps) {
+  const [state, setState] = React.useState<AsyncButtonState>("idle")
+  const isLoading = state === "loading"
+  const isSuccess = state === "success"
+  const isError   = state === "error"
+
+  async function handleClick() {
+    if (isLoading) return
+    setState("loading")
+    try {
+      await onClick()
+      setState("success")
+    } catch {
+      setState("error")
+    }
   }
 
-  const isSaving = state === "saving"
-  const isSaved  = state === "saved"
-  const isError  = state === "error"
+  const variant = isError ? "destructive" : variantProp
 
   return React.createElement(
-    "div",
-    { className: "flex flex-col items-center gap-3" },
-    React.createElement(
-      Button,
-      {
-        variant: isError ? "destructive" : "default",
-        size: "default",
-        disabled: isSaved,
-        onClick: handleClick,
-        className: `relative min-w-32 overflow-hidden${isSaving ? " pointer-events-none" : ""}`,
-      },
-      React.createElement(
-        AnimatePresence,
-        { mode: "popLayout", initial: false },
-        isSaving
-          ? React.createElement(
-              motion.span,
-              { key: "saving", className: "flex items-center justify-center", ...BTN_SNAP_IN },
-              React.createElement(RadialSpinner, { className: "text-inherit shrink-0" }),
-            )
-          : isSaved
-            ? React.createElement(
-                motion.span,
-                { key: "saved", className: "flex items-center gap-2", ...BTN_FADE_DOWN },
-                React.createElement(CheckIcon, { className: "size-4 shrink-0" }),
-                "Saved",
-              )
-            : isError
-              ? React.createElement(
-                  motion.span,
-                  { key: "error", className: "flex items-center gap-2", ...BTN_FADE_DOWN },
-                  React.createElement(RefreshCwIcon, { className: "size-4 shrink-0" }),
-                  "Retry",
-                )
-              : React.createElement(
-                  motion.span,
-                  { key: "idle", className: "flex items-center gap-2", ...BTN_FADE_UP },
-                  React.createElement(SaveIcon, { className: "size-4 shrink-0" }),
-                  "Save",
-                ),
-      ),
-    ),
+    Button,
+    {
+      ...props,
+      variant,
+      disabled: (disableOnSuccess && isSuccess) || props.disabled,
+      onClick: handleClick,
+      className: "overflow-hidden" + (isLoading ? " pointer-events-none" : "") + (props.className ? " " + props.className : ""),
+    },
     React.createElement(
       "span",
-      { className: "text-xs text-muted-foreground" },
-      outcome === "saved" ? "→ success" : "→ error / retry",
+      { className: "grid *:col-start-1 *:row-start-1 *:flex *:items-center *:justify-center *:gap-1.5" },
+      // Invisible sizers for every state → width = max(idle, success, error)
+      React.createElement("span", { className: "invisible", "aria-hidden": "true" }, idleContent),
+      successContent ? React.createElement("span", { className: "invisible", "aria-hidden": "true" }, successContent) : null,
+      errorContent ? React.createElement("span", { className: "invisible", "aria-hidden": "true" }, errorContent) : null,
+      React.createElement(
+        AnimatePresence, { mode: "popLayout", initial: false },
+        isLoading
+          ? React.createElement(
+              motion.span, { key: "loading", ...BTN_SNAP_IN },
+              React.createElement(RadialSpinner, { ["data-icon"]: "inline-start", className: "text-inherit" } as any),
+            )
+          : isSuccess && successContent
+            ? React.createElement(motion.span, { key: "success", ...BTN_FADE_DOWN }, successContent)
+            : isError && errorContent
+              ? React.createElement(motion.span, { key: "error", ...BTN_FADE_DOWN }, errorContent)
+              : React.createElement(motion.span, { key: "idle", ...BTN_FADE_UP }, idleContent),
+      ),
     ),
   )
 }
 
-function ButtonStatesPreview() {
+function AsyncButtonDemo() {
   const [resetKey, setResetKey] = React.useState(0)
+
+  const saveAction = () => new Promise<void>(r => setTimeout(r, 1500))
+  const failAction = () => new Promise<void>((_, reject) => setTimeout(() => reject(new Error("fail")), 1500))
+
   return React.createElement(
     "div",
     { className: "flex flex-col items-center gap-6" },
     React.createElement(
       "div",
       { key: resetKey, className: "flex flex-wrap gap-12 justify-center items-end" },
-      React.createElement(SaveButtonDemo, { outcome: "saved" }),
-      React.createElement(SaveButtonDemo, { outcome: "error" }),
+      // Success demo
+      React.createElement(
+        "div", { className: "flex flex-col items-center gap-3" },
+        React.createElement(
+          AsyncButton,
+          {
+            onClick: saveAction,
+            idleContent: React.createElement(React.Fragment, null,
+              React.createElement(SaveIcon, { ["data-icon"]: "inline-start" } as any), "Save Changes"),
+            successContent: React.createElement(React.Fragment, null,
+              React.createElement(CheckIcon, { ["data-icon"]: "inline-start" } as any), "Saved"),
+          },
+        ),
+        React.createElement("span", { className: "text-xs text-muted-foreground" }, "→ success"),
+      ),
+      // Error demo
+      React.createElement(
+        "div", { className: "flex flex-col items-center gap-3" },
+        React.createElement(
+          AsyncButton,
+          {
+            onClick: failAction,
+            disableOnSuccess: false,
+            idleContent: React.createElement(React.Fragment, null,
+              React.createElement(SaveIcon, { ["data-icon"]: "inline-start" } as any), "Update Changes"),
+            errorContent: React.createElement(React.Fragment, null,
+              React.createElement(RefreshCwIcon, { ["data-icon"]: "inline-start" } as any), "Retry"),
+          },
+        ),
+        React.createElement("span", { className: "text-xs text-muted-foreground" }, "→ error / retry"),
+      ),
     ),
     React.createElement(
       "button",
@@ -1018,67 +1054,100 @@ export function ButtonSpinner() {
     },
     {
       name: "Button States",
-      description: "RadialSpinner runs while saving — pure CSS steps() animation, zero JS overhead. On completion, CheckIcon + Saved or RefreshCwIcon + Retry slides in via AnimatePresence.",
+      description: "A generic AsyncButton that accepts a promise-returning onClick. Shows a RadialSpinner while loading, then animates to success or error content via AnimatePresence. Width stays stable using a CSS grid stack.",
       code: `import { useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { CheckIcon, RefreshCwIcon, SaveIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { RadialSpinner } from "@/components/ui/spinner"
 
-type SaveState = "idle" | "saving" | "saved" | "error"
+type AsyncButtonState = "idle" | "loading" | "success" | "error"
 
 const SPRING = { type: "spring" as const, duration: 0.3, bounce: 0 }
 const FADE_UP   = { initial: { opacity: 0, y:  6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0 }, transition: { ...SPRING, exit: { duration: 0 } } }
 const FADE_DOWN = { initial: { opacity: 0, y: -6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y:  6 }, transition: SPRING }
 const SNAP_IN   = { initial: { opacity: 1, y:  0 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -6 }, transition: SPRING }
 
-function SaveButton({ outcome }: { outcome: "saved" | "error" }) {
-  const [state, setState] = useState<SaveState>("idle")
+type AsyncButtonProps = Omit<React.ComponentProps<typeof Button>, "onClick"> & {
+  onClick: () => Promise<void>
+  idleContent: React.ReactNode
+  successContent?: React.ReactNode
+  errorContent?: React.ReactNode
+  disableOnSuccess?: boolean
+}
 
-  function handleClick() {
-    if (state === "saving") return
-    setState("saving")
-    setTimeout(() => setState(outcome), 1500)
+function AsyncButton({
+  onClick,
+  idleContent,
+  successContent,
+  errorContent,
+  disableOnSuccess = true,
+  variant: variantProp = "default",
+  ...props
+}: AsyncButtonProps) {
+  const [state, setState] = useState<AsyncButtonState>("idle")
+  const isLoading = state === "loading"
+  const isSuccess = state === "success"
+  const isError   = state === "error"
+
+  async function handleClick() {
+    if (isLoading) return
+    setState("loading")
+    try {
+      await onClick()
+      setState("success")
+    } catch {
+      setState("error")
+    }
   }
 
-  const isSaving = state === "saving"
-  const isSaved  = state === "saved"
-  const isError  = state === "error"
+  const variant = isError ? "destructive" : variantProp
 
   return (
     <Button
-      variant={isError ? "destructive" : "default"}
-      size="default"
-      disabled={isSaved}
+      {...props}
+      variant={variant}
+      disabled={(disableOnSuccess && isSuccess) || props.disabled}
       onClick={handleClick}
-      className={"relative min-w-32 overflow-hidden" + (isSaving ? " pointer-events-none" : "")}
+      className={\`overflow-hidden\${isLoading ? " pointer-events-none" : ""}\${props.className ? " " + props.className : ""}\`}
     >
-      <AnimatePresence mode="popLayout" initial={false}>
-        {isSaving ? (
-          <motion.span key="saving" className="flex items-center justify-center" {...SNAP_IN}>
-            <RadialSpinner className="text-inherit shrink-0" />
-          </motion.span>
-        ) : isSaved ? (
-          <motion.span key="saved" className="flex items-center gap-2" {...FADE_DOWN}>
-            <CheckIcon className="size-4 shrink-0" />
-            Saved
-          </motion.span>
-        ) : isError ? (
-          <motion.span key="error" className="flex items-center gap-2" {...FADE_DOWN}>
-            <RefreshCwIcon className="size-4 shrink-0" />
-            Retry
-          </motion.span>
-        ) : (
-          <motion.span key="idle" className="flex items-center gap-2" {...FADE_UP}>
-            <SaveIcon className="size-4 shrink-0" />
-            Save
-          </motion.span>
-        )}
-      </AnimatePresence>
+      {/* Grid stack: invisible sizer + animated content share one cell → stable width */}
+      <span className="grid *:col-start-1 *:row-start-1 *:flex *:items-center *:justify-center *:gap-1.5">
+        {/* Invisible sizers for every state → width = max(idle, success, error) */}
+        <span className="invisible" aria-hidden="true">{idleContent}</span>
+        {successContent && <span className="invisible" aria-hidden="true">{successContent}</span>}
+        {errorContent && <span className="invisible" aria-hidden="true">{errorContent}</span>}
+        <AnimatePresence mode="popLayout" initial={false}>
+          {isLoading ? (
+            <motion.span key="loading" {...SNAP_IN}>
+              <RadialSpinner data-icon="inline-start" className="text-inherit" />
+            </motion.span>
+          ) : isSuccess && successContent ? (
+            <motion.span key="success" {...FADE_DOWN}>{successContent}</motion.span>
+          ) : isError && errorContent ? (
+            <motion.span key="error" {...FADE_DOWN}>{errorContent}</motion.span>
+          ) : (
+            <motion.span key="idle" {...FADE_UP}>{idleContent}</motion.span>
+          )}
+        </AnimatePresence>
+      </span>
     </Button>
   )
+}
+
+// Usage
+function Demo() {
+  return (
+    <AsyncButton
+      onClick={async () => {
+        await fetch("/api/save", { method: "POST" })
+      }}
+      idleContent={<><SaveIcon data-icon="inline-start" /> Save</>}
+      successContent={<><CheckIcon data-icon="inline-start" /> Saved</>}
+      errorContent={<><RefreshCwIcon data-icon="inline-start" /> Retry</>}
+    />
+  )
 }`,
-      preview: React.createElement(ButtonStatesPreview, {}),
+      preview: React.createElement(AsyncButtonDemo, {}),
     },
   ],
 };

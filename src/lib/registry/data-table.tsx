@@ -3184,7 +3184,7 @@ function CrudDemo() {
   const end = Math.min((pagination.pageIndex + 1) * pagination.pageSize, total);
 
   return React.createElement(Card, { className: "w-full gap-3 py-0" },
-    React.createElement(CardHeader, { className: "flex items-center justify-between px-3.5 py-2" },
+    React.createElement(CardHeader, { className: "flex items-center justify-between px-3 pt-3" },
       React.createElement("div", { className: "flex items-center gap-2.5" },
         // Search input
         React.createElement(InputGroup, { className: "w-48" },
